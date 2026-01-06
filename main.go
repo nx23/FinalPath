@@ -99,6 +99,29 @@ func createMap(screen *ebiten.Image, m Map) {
 	}
 }
 
+func (tower *Tower) isEnemyInRange(enemy *Enemy) bool {
+	dx := tower.PositionX - enemy.PositionX
+	dy := tower.PositionY - enemy.PositionY
+	distanceSquared := dx*dx + dy*dy
+	return distanceSquared <= tower.Range*tower.Range
+}
+
+func (tower *Tower) attack(enemy *Enemy) {
+	wasAlive := enemy.isAlive()
+	enemy.life -= tower.Damage
+
+	if enemy.life <= 0 && wasAlive {
+		enemy.life = 0
+		fmt.Println("Enemy defeated!")
+	} else if enemy.isAlive() {
+		fmt.Printf("Enemy hit! Remaining life: %d\n", enemy.life)
+	}
+}
+
+func (enemy *Enemy) isAlive() bool {
+	return enemy.life > 0
+}
+
 func (enemy *Enemy) followPath(m Map) {
 	if enemy.currentPathIndex >= len(m) {
 		return
@@ -141,8 +164,18 @@ func (enemy *Enemy) followPath(m Map) {
 }
 
 func (g *Game) Update() error {
-	enemy.followPath(firstMap)
+	if enemy.isAlive() {
+		enemy.followPath(firstMap)
+	}
 
+	// Check for tower attacks
+	for _, tower := range g.towers {
+		if tower.isEnemyInRange(enemy) {
+			tower.attack(enemy)
+		}
+	}
+
+	// Handle mouse input for placing towers
 	mousePressedCurrent := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
 
 	if mousePressedCurrent && !g.mousePressed && len(g.towers) < g.towerLimit {
@@ -164,7 +197,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	createMap(screen, g.maps[0])
 
 	// Enemy
-	vector.FillRect(screen, enemy.PositionX, enemy.PositionY, 25, 25, color.RGBA{255, 0, 0, 255}, false)
+	if enemy.isAlive() {
+		vector.FillRect(screen, enemy.PositionX, enemy.PositionY, 25, 25, color.RGBA{255, 0, 0, 255}, false)
+	}
 
 	// Towers
 	for _, tower := range g.towers {
