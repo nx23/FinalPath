@@ -10,7 +10,10 @@ import (
 )
 
 type Game struct {
-	maps []Map
+	maps         []Map
+	towers       []Tower
+	towerLimit   int
+	mousePressed bool
 }
 
 type Window struct {
@@ -33,6 +36,15 @@ type Enemy struct {
 	PositionY        float32
 	Speed            float32
 	currentPathIndex int
+	life             int
+}
+
+type Tower struct {
+	PositionX float32
+	PositionY float32
+	Range     float32
+	Damage    int
+	FireRate  float32
 }
 
 var firstMap = Map{
@@ -54,6 +66,17 @@ var enemy = &Enemy{
 	PositionY:        0,
 	Speed:            2,
 	currentPathIndex: 0,
+	life:             100,
+}
+
+func createTower(x, y float32) Tower {
+	return Tower{
+		PositionX: x,
+		PositionY: y,
+		Range:     100,
+		Damage:    10,
+		FireRate:  1,
+	}
 }
 
 func createMap(screen *ebiten.Image, m Map) {
@@ -119,6 +142,17 @@ func (enemy *Enemy) followPath(m Map) {
 
 func (g *Game) Update() error {
 	enemy.followPath(firstMap)
+
+	mousePressedCurrent := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
+
+	if mousePressedCurrent && !g.mousePressed && len(g.towers) < g.towerLimit {
+		mx, my := ebiten.CursorPosition()
+		// Add tower at mouse position
+		g.towers = append(g.towers, createTower(float32(mx), float32(my)))
+	}
+
+	// Update mouse pressed state
+	g.mousePressed = mousePressedCurrent
 	return nil
 }
 
@@ -131,6 +165,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// Enemy
 	vector.FillRect(screen, enemy.PositionX, enemy.PositionY, 25, 25, color.RGBA{255, 0, 0, 255}, false)
+
+	// Towers
+	for _, tower := range g.towers {
+		// Draw range circle centered on tower
+		vector.FillCircle(screen, tower.PositionX, tower.PositionY, tower.Range, color.RGBA{0, 0, 255, 20}, false)
+		// Draw tower square (25x25) centered on position
+		vector.FillRect(screen, tower.PositionX-12.5, tower.PositionY-12.5, 25, 25, color.RGBA{0, 255, 255, 255}, false)
+	}
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
@@ -139,7 +181,8 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeigh
 
 func main() {
 	g := &Game{
-		maps: []Map{firstMap},
+		maps:       []Map{firstMap},
+		towerLimit: 1,
 	}
 	ebiten.SetWindowSize(newWindow.Width, newWindow.Height)
 	ebiten.SetWindowTitle(newWindow.Title)
