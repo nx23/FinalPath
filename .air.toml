@@ -1,0 +1,5 @@
+root = "."
+tmp_dir = "tmp"
+include_dir = ["."]
+exclude_dir = ["tmp"]
+include_ext = ["go", "html", "js", "css"]
