@@ -10,29 +10,40 @@ import (
 	"github.com/nx23/final-path/internal/config"
 	"github.com/nx23/final-path/internal/entity"
 	"github.com/nx23/final-path/internal/gamemap"
+	"github.com/nx23/final-path/internal/hud"
 	"github.com/nx23/final-path/internal/utils"
 )
 
 // Game holds all the game state
 type Game struct {
-	maps         []gamemap.Map
-	enemy        *entity.Enemy
-	towers       []entity.Tower
-	projectiles  []entity.Projectile
-	towerLimit   int
-	mousePressed bool
-	tick         int // Frame counter (60 fps)
-	errorMessage string
-	errorTimer   int
+	maps            []gamemap.Map
+	enemy           *entity.Enemy
+	towers          []entity.Tower
+	projectiles     []entity.Projectile
+	towerLimit      int
+	enemiesDefeated int
+	enemyJustDied   bool
+	mousePressed    bool
+	tick            int // Frame counter (60 fps)
+	errorMessage    string
+	errorTimer      int
+	hud             *hud.HUD
 }
 
 // NewGame initializes a new game with the default map
 func NewGame() *Game {
 	gameMap := gamemap.DefaultMap()
+	towerLimit := 3
 	return &Game{
-		maps:       []gamemap.Map{gameMap},
-		enemy:      entity.NewEnemy(gameMap),
-		towerLimit: 3,
+		maps:            []gamemap.Map{gameMap},
+		enemy:           entity.NewEnemy(gameMap),
+		towerLimit:      towerLimit,
+		enemiesDefeated: 0,
+		hud: &hud.HUD{
+			TowersBuilt:     0,
+			TowersLimit:     towerLimit,
+			EnemiesDefeated: 0,
+		},
 	}
 }
 
@@ -43,6 +54,14 @@ func (g *Game) Update() error {
 	// Update enemy movement
 	if g.enemy.IsAlive() {
 		g.enemy.FollowPath(g.maps[0])
+		g.enemyJustDied = false
+	} else if !g.enemyJustDied {
+		// Enemy just died, respawn it
+		g.enemy = entity.NewEnemy(g.maps[0])
+		g.enemiesDefeated++
+		g.hud.EnemiesDefeated = g.enemiesDefeated
+		g.enemyJustDied = true
+		fmt.Printf("Enemy defeated! Total: %d\n", g.enemiesDefeated)
 	}
 
 	// Check for tower attacks
@@ -96,6 +115,7 @@ func (g *Game) handleTowerPlacement() {
 		if entity.CanPlaceTower(float32(mx), float32(my), g.maps[0]) {
 			// Add tower at mouse position
 			g.towers = append(g.towers, entity.NewTower(float32(mx), float32(my)))
+			g.hud.TowersBuilt = len(g.towers)
 		} else {
 			g.errorMessage = "Cannot place tower on path!"
 			g.errorTimer = 120 // Display only for 120 frames
@@ -136,9 +156,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		vector.FillCircle(screen, projectile.PositionX, projectile.PositionY, config.ProjectileSize, color.RGBA{255, 255, 0, 255}, false)
 	}
 
+	// Draw HUD
+	g.hud.Draw(screen)
+
 	// Draw error message
 	if g.errorMessage != "" {
-		ebitenutil.DebugPrintAt(screen, g.errorMessage, 10, 10)
+		ebitenutil.DebugPrintAt(screen, g.errorMessage, 10, 90)
 	}
 }
 
