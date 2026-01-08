@@ -7,6 +7,7 @@ import (
 	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
@@ -17,6 +18,8 @@ type Game struct {
 	towerLimit   int
 	mousePressed bool
 	tick         int // Frame counter
+	errorMessage string
+	errorTimer   int
 }
 
 type Window struct {
@@ -62,7 +65,7 @@ var firstMap = Map{
 	{StartX: 350, StartY: 0, EndX: 350, EndY: 150},
 	{StartX: 350, StartY: 150, EndX: 550, EndY: 150},
 	{StartX: 550, StartY: 150, EndX: 550, EndY: 350},
-	{StartX: 600, StartY: 350, EndX: 150, EndY: 350},
+	{StartX: 550, StartY: 350, EndX: 150, EndY: 350},
 	{StartX: 150, StartY: 350, EndX: 150, EndY: 600},
 }
 
@@ -88,6 +91,61 @@ func createTower(x, y float32) Tower {
 		Damage:    10,
 		FireRate:  1,
 	}
+}
+
+func isPositionOnPath(x, y float32, m Map) bool {
+	const pathWidth float32 = 50
+	const margin float32 = 30
+
+	for _, path := range m {
+		minX := min(path.StartX, path.EndX) - margin
+		maxX := max(path.StartX, path.EndX) + pathWidth + margin
+		minY := min(path.StartY, path.EndY) - margin
+		maxY := max(path.StartY, path.EndY) + pathWidth + margin
+
+		if x >= minX && x <= maxX && y >= minY && y <= maxY {
+			return true
+		}
+	}
+
+	return false
+}
+
+func canPlaceTower(centerX, centerY float32, m Map) bool {
+	const towerSize float32 = 25
+	const halfSize = towerSize / 2
+
+	// Verify all four corners and center of the tower area
+	points := []struct{ x, y float32 }{
+		{centerX, centerY},                       // Center
+		{centerX - halfSize, centerY - halfSize}, // Top left corner
+		{centerX + halfSize, centerY - halfSize}, // Top right corner
+		{centerX - halfSize, centerY + halfSize}, // Bottom left corner
+		{centerX + halfSize, centerY + halfSize}, // Bottom right corner
+	}
+
+	// All points must be outside the path
+	for _, point := range points {
+		if isPositionOnPath(point.x, point.y, m) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func min(a, b float32) float32 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func max(a, b float32) float32 {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func createProjectile(x, y float32, target *Enemy) Projectile {
@@ -116,6 +174,27 @@ func createMap(screen *ebiten.Image, m Map) {
 		}
 
 		vector.FillRect(screen, path.StartX, path.StartY, width, height, color.White, false)
+	}
+}
+
+func (g *Game) drawBuildableAreas(screen *ebiten.Image) {
+	const gridSize float32 = 40
+	screenWidth := float32(screen.Bounds().Dx())
+	screenHeight := float32(screen.Bounds().Dy())
+
+	// Draw grid of buildable areas
+	for x := float32(0); x < screenWidth; x += gridSize {
+		for y := float32(0); y < screenHeight; y += gridSize {
+			centerX := x + gridSize/2
+			centerY := y + gridSize/2
+
+			if !isPositionOnPath(centerX, centerY, g.maps[0]) {
+				// Valid buildable area
+				vector.FillRect(screen, x, y, gridSize, gridSize, color.RGBA{0, 100, 0, 30}, false)
+				// Draw grid border
+				vector.StrokeRect(screen, x, y, gridSize, gridSize, 1, color.RGBA{0, 150, 0, 50}, false)
+			}
+		}
 	}
 }
 
@@ -244,8 +323,22 @@ func (g *Game) Update() error {
 
 	if mousePressedCurrent && !g.mousePressed && len(g.towers) < g.towerLimit {
 		mx, my := ebiten.CursorPosition()
-		// Add tower at mouse position
-		g.towers = append(g.towers, createTower(float32(mx), float32(my)))
+		// Verify if the entire tower can be placed at the position
+		if canPlaceTower(float32(mx), float32(my), g.maps[0]) {
+			// Add tower at mouse position
+			g.towers = append(g.towers, createTower(float32(mx), float32(my)))
+		} else {
+			g.errorMessage = "Cannot place tower on path!"
+			g.errorTimer = 120 // Display only for 120 frames
+		}
+	}
+
+	// Decrement error message timer
+	if g.errorTimer > 0 {
+		g.errorTimer--
+		if g.errorTimer == 0 {
+			g.errorMessage = ""
+		}
 	}
 
 	// Update mouse pressed state
@@ -256,6 +349,9 @@ func (g *Game) Update() error {
 func (g *Game) Draw(screen *ebiten.Image) {
 	// Background
 	vector.FillRect(screen, 0, 0, float32(screen.Bounds().Dx()), float32(screen.Bounds().Dy()), color.Black, false)
+
+	// Draw buildable areas (areas where towers can be placed)
+	g.drawBuildableAreas(screen)
 
 	// Map
 	createMap(screen, g.maps[0])
@@ -275,6 +371,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Projectiles
 	for _, projectile := range g.projectiles {
 		vector.FillCircle(screen, projectile.PositionX, projectile.PositionY, 5, color.RGBA{255, 255, 0, 255}, false)
+	}
+
+	// Error message
+	if g.errorMessage != "" {
+		ebitenutil.DebugPrintAt(screen, g.errorMessage, 10, 10)
 	}
 }
 
