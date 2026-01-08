@@ -47,6 +47,13 @@ func (m Map) Draw(screen *ebiten.Image) {
 			height = config.PathWidth
 		}
 
+		if path.StartX < path.EndX {
+			width += 50
+		}
+		if path.StartY < path.EndY {
+			height += 50
+		}
+
 		vector.FillRect(screen, path.StartX, path.StartY, width, height, color.White, false)
 	}
 }
