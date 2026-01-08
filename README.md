@@ -171,7 +171,7 @@ This project is licensed under the MIT License.
 ## 📞 Contact
 
 - GitHub: [@nx23](https://github.com/nx23)
-- Project Link: [https://github.com/nx23/final-path](https://github.com/nx23/final-path)
+- Project Link: [https://github.com/nx23/FinalPath](https://github.com/nx23/FinalPath)
 
 ---
 
