@@ -24,6 +24,7 @@ type Game struct {
 	towerLimit           int
 	enemiesDefeated      int
 	mousePressed         bool
+	mouseRightPressed    bool
 	tick                 int // Frame counter (60 fps)
 	errorMessage         string
 	errorTimer           int
@@ -180,7 +181,9 @@ func (g *Game) Update() error {
 // handleMouseInput handles all mouse interactions
 func (g *Game) handleMouseInput() {
 	mousePressedCurrent := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
+	mouseRightPressedCurrent := ebiten.IsMouseButtonPressed(ebiten.MouseButtonRight)
 
+	// Handle left click (place tower or start wave)
 	if mousePressedCurrent && !g.mousePressed {
 		mx, my := ebiten.CursorPosition()
 
@@ -193,8 +196,15 @@ func (g *Game) handleMouseInput() {
 		}
 	}
 
-	// Update mouse pressed state
+	// Handle right click (remove tower)
+	if mouseRightPressedCurrent && !g.mouseRightPressed {
+		mx, my := ebiten.CursorPosition()
+		g.removeTower(float32(mx), float32(my))
+	}
+
+	// Update mouse pressed states
 	g.mousePressed = mousePressedCurrent
+	g.mouseRightPressed = mouseRightPressedCurrent
 }
 
 // startNextWave starts the next wave of enemies
@@ -229,6 +239,29 @@ func (g *Game) placeTower(x, y float32) {
 	} else {
 		g.errorMessage = "Cannot place tower on path!"
 		g.errorTimer = 120
+	}
+}
+
+// removeTower removes a tower at the clicked position
+func (g *Game) removeTower(x, y float32) {
+	// Check if clicking in HUD area
+	if y < config.HUDHeight {
+		return
+	}
+
+	// Find and remove tower at clicked position
+	for i, tower := range g.towers {
+		// Check if click is within tower bounds (using tower size)
+		halfSize := config.TowerSize / 2
+		if x >= tower.PositionX-halfSize && x <= tower.PositionX+halfSize &&
+			y >= tower.PositionY-halfSize && y <= tower.PositionY+halfSize {
+			// Remove tower by swapping with last element and truncating
+			g.towers[i] = g.towers[len(g.towers)-1]
+			g.towers = g.towers[:len(g.towers)-1]
+			g.hud.TowersBuilt = len(g.towers)
+			fmt.Printf("Tower removed! Remaining: %d\n", len(g.towers))
+			return
+		}
 	}
 }
 
