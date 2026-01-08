@@ -90,7 +90,7 @@ func (i *Instructions) Draw(screen *ebiten.Image, drawTextFunc func(*ebiten.Imag
 
 	vector.FillRect(screen, buttonX, buttonY, buttonWidth, buttonHeight, color.RGBA{0, 200, 0, 255}, false)
 	vector.StrokeRect(screen, buttonX, buttonY, buttonWidth, buttonHeight, 3, color.RGBA{255, 255, 255, 255}, false)
-	drawTextFunc(screen, "CLICK TO START", float64(buttonX+50), float64(buttonY+12), 2.5)
+	drawTextFunc(screen, "CLICK TO START", float64(buttonX+50), float64(buttonY+6), 2.5)
 }
 
 // Show displays the instructions screen

@@ -76,7 +76,10 @@ func (g *Game) Update() error {
 
 	// Handle instructions screen
 	if g.instructionsScreen.Active {
-		g.instructionsScreen.Update()
+		if g.instructionsScreen.Update() {
+			// Instructions were just closed, consume the click to prevent tower placement
+			g.mousePressed = true
+		}
 		return nil
 	}
 
