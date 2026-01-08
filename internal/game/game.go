@@ -12,6 +12,7 @@ import (
 	"github.com/nx23/final-path/internal/gameover"
 	"github.com/nx23/final-path/internal/hud"
 	"github.com/nx23/final-path/internal/instructions"
+	"github.com/nx23/final-path/internal/renderer"
 	"github.com/nx23/final-path/internal/shop"
 	"github.com/nx23/final-path/internal/utils"
 )
@@ -320,31 +321,19 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	vector.FillRect(screen, 0, 0, float32(screen.Bounds().Dx()), float32(screen.Bounds().Dy()), color.Black, false)
 
 	// Draw buildable areas
-	g.drawBuildableAreas(screen)
+	renderer.DrawBuildableAreas(screen, g.maps[0])
 
 	// Draw map
 	g.maps[0].Draw(screen)
 
 	// Draw all enemies
-	for _, enemy := range g.enemies {
-		if enemy.IsAlive() {
-			topLeftX, topLeftY := utils.CenteredPosition{X: enemy.PositionX, Y: enemy.PositionY, Size: config.EnemySize}.TopLeft()
-			vector.FillRect(screen, topLeftX, topLeftY, config.EnemySize, config.EnemySize, color.RGBA{255, 0, 0, 255}, false)
-		}
-	}
+	renderer.DrawEnemies(screen, g.enemies)
 
 	// Draw towers
-	for _, tower := range g.towers {
-		// Draw range circle centered on tower
-		vector.StrokeCircle(screen, tower.PositionX, tower.PositionY, tower.Range, 2, color.RGBA{0, 0, 255, 20}, false)
-		topLeftX, topLeftY := utils.CenteredPosition{X: tower.PositionX, Y: tower.PositionY, Size: config.TowerSize}.TopLeft()
-		vector.FillRect(screen, topLeftX, topLeftY, config.TowerSize, config.TowerSize, color.RGBA{0, 255, 255, 255}, false)
-	}
+	renderer.DrawTowers(screen, g.towers)
 
 	// Draw projectiles
-	for _, projectile := range g.projectiles {
-		vector.FillCircle(screen, projectile.PositionX, projectile.PositionY, config.ProjectileSize, color.RGBA{255, 255, 0, 255}, false)
-	}
+	renderer.DrawProjectiles(screen, g.projectiles)
 
 	// Draw HUD
 	g.hud.Draw(screen)
@@ -361,28 +350,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Draw error message (below HUD, larger text)
 	if g.errorMessage != "" {
 		utils.DrawLargeText(screen, g.errorMessage, 20, float64(config.HUDHeight)+10, 1.5)
-	}
-}
-
-// drawBuildableAreas draws a green grid showing where towers can be placed
-func (g *Game) drawBuildableAreas(screen *ebiten.Image) {
-	const gridSize float32 = 40
-	screenWidth := float32(screen.Bounds().Dx())
-	screenHeight := float32(screen.Bounds().Dy())
-
-	// Draw grid of buildable areas
-	for x := float32(0); x < screenWidth; x += gridSize {
-		for y := float32(0); y < screenHeight; y += gridSize {
-			centerX := x + gridSize/2
-			centerY := y + gridSize/2
-
-			if !gamemap.IsPositionOnPath(centerX, centerY, g.maps[0]) {
-				// Valid buildable area
-				vector.FillRect(screen, x, y, gridSize, gridSize, color.RGBA{0, 100, 0, 30}, false)
-				// Draw grid border
-				vector.StrokeRect(screen, x, y, gridSize, gridSize, 1, color.RGBA{0, 150, 0, 50}, false)
-			}
-		}
 	}
 }
 
@@ -435,32 +402,29 @@ func (g *Game) handleShopClick(mx, my int) {
 		return
 	}
 
-	// Get the cost of the item
-	var cost int
-	for _, item := range g.shop.Items {
-		if item.ID == itemID {
-			cost = item.Cost
-			break
+	// Process the purchase
+	newCoins, newTowerLimit, newDamageBoost, newFireRateBoost, success := g.shop.PurchaseItem(
+		itemID, g.coins, g.towerLimit, g.towerDamageBoost, g.towerFireRateBoost,
+	)
+
+	if success {
+		g.coins = newCoins
+		g.towerLimit = newTowerLimit
+		g.towerDamageBoost = newDamageBoost
+		g.towerFireRateBoost = newFireRateBoost
+
+		// Update HUD
+		g.hud.Coins = g.coins
+		g.hud.TowersLimit = g.towerLimit
+
+		// Log purchase
+		switch itemID {
+		case 1:
+			fmt.Printf("Bought tower slot! New limit: %d\n", g.towerLimit)
+		case 2:
+			fmt.Printf("Tower damage increased! Total bonus: +%d\n", g.towerDamageBoost)
+		case 4:
+			fmt.Printf("Tower fire rate increased! Multiplier: %.1fx\n", g.towerFireRateBoost)
 		}
 	}
-
-	// Deduct cost and apply effect
-	g.coins -= cost
-
-	switch itemID {
-	case 1: // Buy Tower Slot
-		g.towerLimit++
-		fmt.Printf("Bought tower slot! New limit: %d\n", g.towerLimit)
-	case 2: // Tower Damage Upgrade
-		g.towerDamageBoost += 10
-		fmt.Printf("Tower damage increased! Total bonus: +%d\n", g.towerDamageBoost)
-	case 4: // Fire Rate Upgrade
-		g.towerFireRateBoost += 0.1
-		fmt.Printf("Tower fire rate increased! Multiplier: %.1fx\n", g.towerFireRateBoost)
-	}
-
-	// Update HUD
-	g.hud.Coins = g.coins
-	g.hud.TowersLimit = g.towerLimit
-	g.hud.Lives = g.lives
 }

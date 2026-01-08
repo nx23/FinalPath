@@ -132,3 +132,40 @@ func (s *Shop) Toggle() {
 func (s *Shop) Close() {
 	s.Open = false
 }
+
+// PurchaseItem processes the purchase of a shop item
+// Returns the new values after purchase: coins, towerLimit, towerDamageBoost, towerFireRateBoost, success
+func (s *Shop) PurchaseItem(itemID, coins, towerLimit, towerDamageBoost int, towerFireRateBoost float32) (newCoins, newTowerLimit, newDamageBoost int, newFireRateBoost float32, success bool) {
+	// Find the item
+	var item *ShopItem
+	for i := range s.Items {
+		if s.Items[i].ID == itemID {
+			item = &s.Items[i]
+			break
+		}
+	}
+
+	if item == nil || coins < item.Cost {
+		return coins, towerLimit, towerDamageBoost, towerFireRateBoost, false
+	}
+
+	// Deduct cost
+	newCoins = coins - item.Cost
+	newTowerLimit = towerLimit
+	newDamageBoost = towerDamageBoost
+	newFireRateBoost = towerFireRateBoost
+
+	// Apply effect based on item ID
+	switch itemID {
+	case 1: // Buy Tower Slot
+		newTowerLimit++
+	case 2: // Tower Damage Upgrade
+		newDamageBoost += 10
+	case 4: // Fire Rate Upgrade
+		newFireRateBoost += 0.1
+	default:
+		return coins, towerLimit, towerDamageBoost, towerFireRateBoost, false
+	}
+
+	return newCoins, newTowerLimit, newDamageBoost, newFireRateBoost, true
+}
