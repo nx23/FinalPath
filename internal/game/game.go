@@ -16,18 +16,20 @@ import (
 
 // Game holds all the game state
 type Game struct {
-	maps            []gamemap.Map
-	enemy           *entity.Enemy
-	towers          []entity.Tower
-	projectiles     []entity.Projectile
-	towerLimit      int
-	enemiesDefeated int
-	enemyJustDied   bool
-	mousePressed    bool
-	tick            int // Frame counter (60 fps)
-	errorMessage    string
-	errorTimer      int
-	hud             *hud.HUD
+	maps               []gamemap.Map
+	enemy              *entity.Enemy
+	towers             []entity.Tower
+	projectiles        []entity.Projectile
+	towerLimit         int
+	enemiesDefeated    int
+	enemyJustDied      bool
+	mousePressed       bool
+	tick               int // Frame counter (60 fps)
+	errorMessage       string
+	errorTimer         int
+	hud                *hud.HUD
+	enemiesPerWave     int // Number of enemies in current wave
+	enemiesSpawnedInWave int // Number of enemies spawned in current wave
 }
 
 // NewGame initializes a new game with the default map
@@ -53,12 +55,27 @@ func (g *Game) Update() error {
 			g.enemy.FollowPath(g.maps[0])
 			g.enemyJustDied = false
 		} else if !g.enemyJustDied {
-			// Enemy just died, respawn it
-			g.enemy = entity.NewEnemy(g.maps[0])
+			// Enemy just died
 			g.enemiesDefeated++
 			g.hud.EnemiesDefeated = g.enemiesDefeated
+			g.hud.EnemiesKilledInWave++
 			g.enemyJustDied = true
 			fmt.Printf("Enemy defeated! Total: %d\n", g.enemiesDefeated)
+			
+			// Check if there are more enemies to spawn in this wave
+			if g.enemiesSpawnedInWave < g.enemiesPerWave {
+				// Respawn next enemy in wave
+				g.enemy = entity.NewEnemy(g.maps[0])
+				g.enemiesSpawnedInWave++
+			} else {
+				// Wave complete, deactivate it
+				g.hud.WaveActive = false
+				g.hud.EnemiesKilledInWave = 0
+				// Calculate enemies for next wave
+				nextWaveEnemies := 3 + g.hud.CurrentWave * 2
+				g.hud.EnemiesInWave = nextWaveEnemies
+				fmt.Printf("Wave %d complete!\n", g.hud.CurrentWave)
+			}
 		}
 
 		// Check for tower attacks
@@ -126,9 +143,18 @@ func (g *Game) handleMouseInput() {
 func (g *Game) startNextWave() {
 	g.hud.CurrentWave++
 	g.hud.WaveActive = true
+	
+	// Set number of enemies for this wave (increases with wave number)
+	g.enemiesPerWave = 3 + (g.hud.CurrentWave - 1) * 2
+	g.enemiesSpawnedInWave = 1 // First enemy spawns immediately
+	
+	// Update HUD with wave info
+	g.hud.EnemiesInWave = g.enemiesPerWave
+	g.hud.EnemiesKilledInWave = 0
+	
 	g.enemy = entity.NewEnemy(g.maps[0])
 	g.enemyJustDied = false
-	fmt.Printf("Wave %d started!\n", g.hud.CurrentWave)
+	fmt.Printf("Wave %d started! (%d enemies)\n", g.hud.CurrentWave, g.enemiesPerWave)
 }
 
 // placeTower attempts to place a tower at the given position

@@ -13,29 +13,33 @@ import (
 
 // HUD represents the game's heads-up display
 type HUD struct {
-	TowersBuilt     int
-	TowersLimit     int
-	EnemiesDefeated int
-	CurrentWave     int
-	WaveActive      bool
-	buttonX         float32
-	buttonY         float32
-	buttonWidth     float32
-	buttonHeight    float32
+	TowersBuilt         int
+	TowersLimit         int
+	EnemiesDefeated     int
+	CurrentWave         int
+	WaveActive          bool
+	EnemiesInWave       int // Total enemies in current/next wave
+	EnemiesKilledInWave int // Enemies killed in current wave
+	buttonX             float32
+	buttonY             float32
+	buttonWidth         float32
+	buttonHeight        float32
 }
 
 // NewHUD creates a new HUD instance
 func NewHUD(towerLimit int) *HUD {
 	return &HUD{
-		TowersBuilt:     0,
-		TowersLimit:     towerLimit,
-		EnemiesDefeated: 0,
-		CurrentWave:     0,
-		WaveActive:      false,
-		buttonX:         550,
-		buttonY:         30,
-		buttonWidth:     200,
-		buttonHeight:    60,
+		TowersBuilt:         0,
+		TowersLimit:         towerLimit,
+		EnemiesDefeated:     0,
+		CurrentWave:         0,
+		WaveActive:          false,
+		EnemiesInWave:       3, // First wave starts with 3 enemies
+		EnemiesKilledInWave: 0,
+		buttonX:             620,
+		buttonY:             35,
+		buttonWidth:         150,
+		buttonHeight:        50,
 	}
 }
 
@@ -45,13 +49,22 @@ func (h *HUD) Draw(screen *ebiten.Image) {
 	screenWidth := float32(screen.Bounds().Dx())
 	vector.FillRect(screen, 0, 0, screenWidth, config.HUDHeight, color.RGBA{0, 0, 0, 255}, false)
 
-	// Tower info - larger text
+	// Tower info with wave enemies preview
 	towerText := fmt.Sprintf("Towers: %d/%d", h.TowersBuilt, h.TowersLimit)
-	h.drawLargeText(screen, towerText, 20, 20, 3.0)
+	h.drawLargeText(screen, towerText, 20, 20, 2.5)
 
-	// Enemy info - larger text
+	// Wave enemies info (next to towers)
+	var waveEnemiesText string
+	if h.WaveActive {
+		waveEnemiesText = fmt.Sprintf("Wave %d: %d/%d", h.CurrentWave, h.EnemiesKilledInWave, h.EnemiesInWave)
+	} else {
+		waveEnemiesText = fmt.Sprintf("Next Wave: %d enemies", h.EnemiesInWave)
+	}
+	h.drawLargeText(screen, waveEnemiesText, 280, 20, 2.5)
+
+	// Enemy info
 	enemyText := fmt.Sprintf("Enemies Defeated: %d", h.EnemiesDefeated)
-	h.drawLargeText(screen, enemyText, 20, 65, 3.0)
+	h.drawLargeText(screen, enemyText, 20, 65, 2.5)
 
 	// Draw Next Wave button
 	h.drawButton(screen)
@@ -67,10 +80,11 @@ func (h *HUD) drawButton(screen *ebiten.Image) {
 		buttonColor = color.RGBA{100, 100, 100, 200}
 		buttonText = fmt.Sprintf("Wave %d", h.CurrentWave)
 	} else {
-		// Ready for next wave - green button
-		buttonColor = color.RGBA{0, 200, 0, 200}
-		buttonText = "Start Wave"
-		if h.CurrentWave > 0 {
+		// Ready for next wave - blue button
+		buttonColor = color.RGBA{0, 120, 255, 220}
+		if h.CurrentWave == 0 {
+			buttonText = "Start Wave"
+		} else {
 			buttonText = "Next Wave"
 		}
 	}
@@ -82,7 +96,7 @@ func (h *HUD) drawButton(screen *ebiten.Image) {
 	vector.StrokeRect(screen, h.buttonX, h.buttonY, h.buttonWidth, h.buttonHeight, 3, color.RGBA{255, 255, 255, 255}, false)
 
 	// Draw button text (centered)
-	h.drawLargeText(screen, buttonText, float64(h.buttonX)+20, float64(h.buttonY)+15, 2.5)
+	h.drawLargeText(screen, buttonText, float64(h.buttonX)+15, float64(h.buttonY)+12, 2.2)
 }
 
 // IsButtonClicked checks if the button was clicked at the given coordinates
