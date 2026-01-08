@@ -39,11 +39,7 @@ func NewGame() *Game {
 		enemy:           entity.NewEnemy(gameMap),
 		towerLimit:      towerLimit,
 		enemiesDefeated: 0,
-		hud: &hud.HUD{
-			TowersBuilt:     0,
-			TowersLimit:     towerLimit,
-			EnemiesDefeated: 0,
-		},
+		hud:             hud.NewHUD(towerLimit),
 	}
 }
 
@@ -51,47 +47,49 @@ func NewGame() *Game {
 func (g *Game) Update() error {
 	g.tick++
 
-	// Update enemy movement
-	if g.enemy.IsAlive() {
-		g.enemy.FollowPath(g.maps[0])
-		g.enemyJustDied = false
-	} else if !g.enemyJustDied {
-		// Enemy just died, respawn it
-		g.enemy = entity.NewEnemy(g.maps[0])
-		g.enemiesDefeated++
-		g.hud.EnemiesDefeated = g.enemiesDefeated
-		g.enemyJustDied = true
-		fmt.Printf("Enemy defeated! Total: %d\n", g.enemiesDefeated)
-	}
-
-	// Check for tower attacks
-	for i := range g.towers {
-		tower := &g.towers[i]
-		if tower.IsEnemyInRange(g.enemy) && g.enemy.IsAlive() && tower.CanFire(g.tick) {
-			g.projectiles = append(g.projectiles, tower.Attack(g.enemy))
-			tower.LastFireTime = g.tick
+	// Update enemy movement only if wave is active
+	if g.hud.WaveActive {
+		if g.enemy.IsAlive() {
+			g.enemy.FollowPath(g.maps[0])
+			g.enemyJustDied = false
+		} else if !g.enemyJustDied {
+			// Enemy just died, respawn it
+			g.enemy = entity.NewEnemy(g.maps[0])
+			g.enemiesDefeated++
+			g.hud.EnemiesDefeated = g.enemiesDefeated
+			g.enemyJustDied = true
+			fmt.Printf("Enemy defeated! Total: %d\n", g.enemiesDefeated)
 		}
-	}
 
-	// Update projectiles
-	var activeProjectiles []entity.Projectile
-	for i := range g.projectiles {
-		projectile := &g.projectiles[i]
-		if projectile.Hit() {
-			// Projectile hit the target
-			if projectile.Target != nil && projectile.Target.IsAlive() {
-				projectile.Target.TakeDamage(10)
-				fmt.Printf("Enemy hit! Life: %d\n", projectile.Target.Life)
+		// Check for tower attacks
+		for i := range g.towers {
+			tower := &g.towers[i]
+			if tower.IsEnemyInRange(g.enemy) && g.enemy.IsAlive() && tower.CanFire(g.tick) {
+				g.projectiles = append(g.projectiles, tower.Attack(g.enemy))
+				tower.LastFireTime = g.tick
 			}
-		} else if projectile.Target != nil && projectile.Target.IsAlive() {
-			// Projectile still moving
-			activeProjectiles = append(activeProjectiles, *projectile)
 		}
-	}
-	g.projectiles = activeProjectiles
 
-	// Handle mouse input for placing towers
-	g.handleTowerPlacement()
+		// Update projectiles
+		var activeProjectiles []entity.Projectile
+		for i := range g.projectiles {
+			projectile := &g.projectiles[i]
+			if projectile.Hit() {
+				// Projectile hit the target
+				if projectile.Target != nil && projectile.Target.IsAlive() {
+					projectile.Target.TakeDamage(10)
+					fmt.Printf("Enemy hit! Life: %d\n", projectile.Target.Life)
+				}
+			} else if projectile.Target != nil && projectile.Target.IsAlive() {
+				// Projectile still moving
+				activeProjectiles = append(activeProjectiles, *projectile)
+			}
+		}
+		g.projectiles = activeProjectiles
+	}
+
+	// Handle mouse input
+	g.handleMouseInput()
 
 	// Decrement error message timer
 	if g.errorTimer > 0 {
@@ -104,26 +102,44 @@ func (g *Game) Update() error {
 	return nil
 }
 
-// handleTowerPlacement handles mouse clicks to place towers.
-// Only allows placing towers off the path and respects the tower limit.
-func (g *Game) handleTowerPlacement() {
+// handleMouseInput handles all mouse interactions
+func (g *Game) handleMouseInput() {
 	mousePressedCurrent := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
 
-	if mousePressedCurrent && !g.mousePressed && len(g.towers) < g.towerLimit {
+	if mousePressedCurrent && !g.mousePressed {
 		mx, my := ebiten.CursorPosition()
-		// Verify if the entire tower can be placed at the position
-		if entity.CanPlaceTower(float32(mx), float32(my), g.maps[0]) {
-			// Add tower at mouse position
-			g.towers = append(g.towers, entity.NewTower(float32(mx), float32(my)))
-			g.hud.TowersBuilt = len(g.towers)
-		} else {
-			g.errorMessage = "Cannot place tower on path!"
-			g.errorTimer = 120 // Display only for 120 frames
+		
+		// Check if clicking the Next Wave button
+		if g.hud.IsButtonClicked(mx, my) && !g.hud.WaveActive {
+			g.startNextWave()
+		} else if len(g.towers) < g.towerLimit {
+			// Try to place a tower
+			g.placeTower(float32(mx), float32(my))
 		}
 	}
 
 	// Update mouse pressed state
 	g.mousePressed = mousePressedCurrent
+}
+
+// startNextWave starts the next wave of enemies
+func (g *Game) startNextWave() {
+	g.hud.CurrentWave++
+	g.hud.WaveActive = true
+	g.enemy = entity.NewEnemy(g.maps[0])
+	g.enemyJustDied = false
+	fmt.Printf("Wave %d started!\n", g.hud.CurrentWave)
+}
+
+// placeTower attempts to place a tower at the given position
+func (g *Game) placeTower(x, y float32) {
+	if entity.CanPlaceTower(x, y, g.maps[0]) {
+		g.towers = append(g.towers, entity.NewTower(x, y))
+		g.hud.TowersBuilt = len(g.towers)
+	} else {
+		g.errorMessage = "Cannot place tower on path!"
+		g.errorTimer = 120
+	}
 }
 
 // Draw renders everything on the screen every frame
@@ -159,9 +175,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Draw HUD
 	g.hud.Draw(screen)
 
-	// Draw error message
+	// Draw error message (below HUD)
 	if g.errorMessage != "" {
-		ebitenutil.DebugPrintAt(screen, g.errorMessage, 10, 90)
+		ebitenutil.DebugPrintAt(screen, g.errorMessage, 20, int(config.HUDHeight)+10)
 	}
 }
 

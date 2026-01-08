@@ -22,12 +22,13 @@ type Map []Path
 
 // DefaultMap returns the default game map
 func DefaultMap() Map {
+	offset := config.MapOffsetY
 	return Map{
-		{StartX: 350, StartY: 0, EndX: 350, EndY: 150},
-		{StartX: 350, StartY: 150, EndX: 550, EndY: 150},
-		{StartX: 550, StartY: 150, EndX: 550, EndY: 350},
-		{StartX: 550, StartY: 350, EndX: 150, EndY: 350},
-		{StartX: 150, StartY: 350, EndX: 150, EndY: 600},
+		{StartX: 350, StartY: 0 + offset, EndX: 350, EndY: 150 + offset},
+		{StartX: 350, StartY: 150 + offset, EndX: 550, EndY: 150 + offset},
+		{StartX: 550, StartY: 150 + offset, EndX: 550, EndY: 350 + offset},
+		{StartX: 550, StartY: 350 + offset, EndX: 150, EndY: 350 + offset},
+		{StartX: 150, StartY: 350 + offset, EndX: 150, EndY: 600 + offset},
 	}
 }
 

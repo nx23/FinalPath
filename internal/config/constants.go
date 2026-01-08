@@ -8,6 +8,13 @@ const (
 	ProjectileSize float32 = 5
 )
 
+// HUD configuration
+const (
+	HUDHeight   float32 = 120  // Height of the HUD panel
+	HUDFontSize float32 = 2.5  // Font scale multiplier
+	MapOffsetY  float32 = 120  // Vertical offset to push map down
+)
+
 // Window holds the game window configuration
 type Window struct {
 	Width  int
@@ -18,6 +25,6 @@ type Window struct {
 // Config is the default window configuration
 var Config = Window{
 	Width:  800,
-	Height: 600,
+	Height: 720, // Increased to accommodate HUD + map
 	Title:  "Final Path v1.0",
 }
