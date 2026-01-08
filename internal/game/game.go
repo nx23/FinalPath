@@ -11,6 +11,7 @@ import (
 	"github.com/nx23/final-path/internal/gamemap"
 	"github.com/nx23/final-path/internal/gameover"
 	"github.com/nx23/final-path/internal/hud"
+	"github.com/nx23/final-path/internal/instructions"
 	"github.com/nx23/final-path/internal/shop"
 	"github.com/nx23/final-path/internal/utils"
 )
@@ -29,16 +30,17 @@ type Game struct {
 	errorMessage         string
 	errorTimer           int
 	hud                  *hud.HUD
-	enemiesPerWave       int // Number of enemies in current wave
-	enemiesSpawnedInWave int // Number of enemies spawned in current wave
-	lastSpawnTick        int // Last tick when an enemy was spawned
-	spawnInterval        int // Ticks between enemy spawns (60 ticks = 1 second)
-	lives                int // Player lives
-	coins                int // Player currency for shop
-	towerDamageBoost     int // Global damage boost for all towers
+	enemiesPerWave       int     // Number of enemies in current wave
+	enemiesSpawnedInWave int     // Number of enemies spawned in current wave
+	lastSpawnTick        int     // Last tick when an enemy was spawned
+	spawnInterval        int     // Ticks between enemy spawns (60 ticks = 1 second)
+	lives                int     // Player lives
+	coins                int     // Player currency for shop
+	towerDamageBoost     int     // Global damage boost for all towers
 	towerFireRateBoost   float32 // Global fire rate multiplier (1.0 = normal, 1.1 = 10% faster)
 	shop                 *shop.Shop
 	gameOverScreen       *gameover.GameOver
+	instructionsScreen   *instructions.Instructions
 }
 
 // NewGame initializes a new game with the default map
@@ -48,18 +50,19 @@ func NewGame() *Game {
 	initialLives := 10
 
 	g := &Game{
-		maps:                []gamemap.Map{gameMap},
-		enemies:             []*entity.Enemy{},
-		towerLimit:          towerLimit,
-		enemiesDefeated:     0,
-		hud:                 hud.NewHUD(towerLimit),
-		spawnInterval:       60, // 1 second between spawns (60 fps * 1)
-		lives:               initialLives,
-		coins:               50,  // Start with 50 coins
-		towerDamageBoost:    0,   // No damage boost initially
-		towerFireRateBoost:  1.0, // Normal fire rate (1.0x)
-		shop:                shop.NewShop(),
-		gameOverScreen:      gameover.NewGameOver(),
+		maps:               []gamemap.Map{gameMap},
+		enemies:            []*entity.Enemy{},
+		towerLimit:         towerLimit,
+		enemiesDefeated:    0,
+		hud:                hud.NewHUD(towerLimit),
+		spawnInterval:      60, // 1 second between spawns (60 fps * 1)
+		lives:              initialLives,
+		coins:              50,  // Start with 50 coins
+		towerDamageBoost:   0,   // No damage boost initially
+		towerFireRateBoost: 1.0, // Normal fire rate (1.0x)
+		shop:               shop.NewShop(),
+		gameOverScreen:     gameover.NewGameOver(),
+		instructionsScreen: instructions.NewInstructions(),
 	}
 
 	// Sync lives with HUD
@@ -70,6 +73,12 @@ func NewGame() *Game {
 // Update is called every frame (60x per second) to update the game state
 func (g *Game) Update() error {
 	g.tick++
+
+	// Handle instructions screen
+	if g.instructionsScreen.Active {
+		g.instructionsScreen.Update()
+		return nil
+	}
 
 	// Handle game over state
 	if g.gameOverScreen.Active {
@@ -143,7 +152,7 @@ func (g *Game) Update() error {
 			boostedFireRate := tower.FireRate * g.towerFireRateBoost
 			ticksPerShot := int(60.0 / boostedFireRate)
 			canFire := g.tick-tower.LastFireTime >= ticksPerShot
-			
+
 			if canFire {
 				// Find closest enemy in range
 				for _, enemy := range g.enemies {
@@ -343,6 +352,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Draw game over screen if game is over
 	g.gameOverScreen.Draw(screen, g.enemiesDefeated, utils.DrawLargeText)
 
+	// Draw instructions overlay if showing
+	g.instructionsScreen.Draw(screen, utils.DrawLargeText)
+
 	// Draw error message (below HUD, larger text)
 	if g.errorMessage != "" {
 		utils.DrawLargeText(screen, g.errorMessage, 20, float64(config.HUDHeight)+10, 1.5)
@@ -398,6 +410,7 @@ func (g *Game) restartGame() {
 	// Reset shop and game over screen
 	g.shop.Close()
 	g.gameOverScreen.Reset()
+	g.instructionsScreen.Hide()
 
 	// Reset HUD
 	g.hud.TowersBuilt = 0
@@ -410,8 +423,6 @@ func (g *Game) restartGame() {
 	g.hud.Lives = 10
 	g.hud.Coins = 50
 }
-
-
 
 // handleShopClick handles clicks on shop items using the shop package
 func (g *Game) handleShopClick(mx, my int) {
