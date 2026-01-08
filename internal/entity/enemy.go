@@ -18,12 +18,11 @@ type Enemy struct {
 	Life             int
 }
 
-// NewEnemy creates an enemy positioned at the map's starting point
 func NewEnemy(m gamemap.Map) *Enemy {
 	if len(m) == 0 {
 		return &Enemy{}
 	}
-	
+
 	firstPath := m[0]
 	return &Enemy{
 		PositionX:        utils.CenterInPath(firstPath.StartX, config.PathWidth),
@@ -34,12 +33,10 @@ func NewEnemy(m gamemap.Map) *Enemy {
 	}
 }
 
-// IsAlive checks if the enemy is still alive
 func (e *Enemy) IsAlive() bool {
 	return e.Life > 0
 }
 
-// TakeDamage applies damage to the enemy
 func (e *Enemy) TakeDamage(damage int) {
 	e.Life -= damage
 	if e.Life < 0 {
@@ -47,8 +44,7 @@ func (e *Enemy) TakeDamage(damage int) {
 	}
 }
 
-// FollowPath makes the enemy follow the map path.
-// It automatically moves through the current path and advances to the next one when complete.
+// FollowPath moves enemy along the map path
 func (e *Enemy) FollowPath(m gamemap.Map) {
 	if e.CurrentPathIndex >= len(m) {
 		return
@@ -69,7 +65,8 @@ func (e *Enemy) FollowPath(m gamemap.Map) {
 			e.CurrentPathIndex++
 			fmt.Printf("Path %d completed\n", e.CurrentPathIndex)
 		}
-	} else if path.StartY == path.EndY { // Horizontal movement
+		// Horizontal movement
+	} else if path.StartY == path.EndY {
 		// Center the enemy on Y axis for this horizontal path
 		targetCenterY := utils.CenterInPath(path.StartY, config.PathWidth)
 		e.PositionY = targetCenterY

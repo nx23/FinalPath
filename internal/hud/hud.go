@@ -10,17 +10,16 @@ import (
 	"github.com/nx23/final-path/internal/utils"
 )
 
-// HUD represents the game's heads-up display
 type HUD struct {
 	TowersBuilt         int
 	TowersLimit         int
 	EnemiesDefeated     int
 	CurrentWave         int
 	WaveActive          bool
-	EnemiesInWave       int // Total enemies in current/next wave
-	EnemiesKilledInWave int // Enemies killed in current wave
-	Lives               int // Player lives
-	Coins               int // Player currency
+	EnemiesInWave       int
+	EnemiesKilledInWave int
+	Lives               int
+	Coins               int
 	buttonX             float32
 	buttonY             float32
 	buttonWidth         float32
@@ -31,7 +30,6 @@ type HUD struct {
 	shopButtonHeight    float32
 }
 
-// NewHUD creates a new HUD instance
 func NewHUD(towerLimit int) *HUD {
 	return &HUD{
 		TowersBuilt:         0,
@@ -39,10 +37,10 @@ func NewHUD(towerLimit int) *HUD {
 		EnemiesDefeated:     0,
 		CurrentWave:         0,
 		WaveActive:          false,
-		EnemiesInWave:       3, // First wave starts with 3 enemies
+		EnemiesInWave:       3,
 		EnemiesKilledInWave: 0,
-		Lives:               10, // Start with 10 lives
-		Coins:               50, // Start with 50 coins
+		Lives:               10,
+		Coins:               50,
 		buttonX:             620,
 		buttonY:             35,
 		buttonWidth:         150,
@@ -54,7 +52,6 @@ func NewHUD(towerLimit int) *HUD {
 	}
 }
 
-// Draw renders the HUD on the screen
 func (h *HUD) Draw(screen *ebiten.Image) {
 	// Draw background panel
 	screenWidth := float32(screen.Bounds().Dx())

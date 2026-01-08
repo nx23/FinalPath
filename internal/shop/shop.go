@@ -8,7 +8,6 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
-// Shop manages the game shop system
 type Shop struct {
 	Open   bool
 	X      float32
@@ -18,7 +17,6 @@ type Shop struct {
 	Items  []ShopItem
 }
 
-// ShopItem represents an item available for purchase
 type ShopItem struct {
 	ID          int
 	Name        string
@@ -27,7 +25,6 @@ type ShopItem struct {
 	Y           float32 // Y position relative to shop
 }
 
-// NewShop creates a new shop instance
 func NewShop() *Shop {
 	return &Shop{
 		Open:   false,
@@ -43,7 +40,6 @@ func NewShop() *Shop {
 	}
 }
 
-// Draw renders the shop overlay
 func (s *Shop) Draw(screen *ebiten.Image, coins int, drawTextFunc func(*ebiten.Image, string, float64, float64, float64)) {
 	if !s.Open {
 		return
@@ -133,8 +129,6 @@ func (s *Shop) Close() {
 	s.Open = false
 }
 
-// PurchaseItem processes the purchase of a shop item
-// Returns the new values after purchase: coins, towerLimit, towerDamageBoost, towerFireRateBoost, success
 func (s *Shop) PurchaseItem(itemID, coins, towerLimit, towerDamageBoost int, towerFireRateBoost float32) (newCoins, newTowerLimit, newDamageBoost int, newFireRateBoost float32, success bool) {
 	// Find the item
 	var item *ShopItem

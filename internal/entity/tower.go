@@ -12,11 +12,10 @@ type Tower struct {
 	PositionY    float32 // Center Y
 	Range        float32
 	Damage       int
-	FireRate     float32 // Shots per second
+	FireRate     float32
 	LastFireTime int
 }
 
-// NewTower creates a tower at the specified position
 func NewTower(x, y float32) Tower {
 	return Tower{
 		PositionX:    x,
@@ -28,8 +27,7 @@ func NewTower(x, y float32) Tower {
 	}
 }
 
-// IsEnemyInRange checks if the enemy is within range.
-// Uses squared distance to avoid sqrt (faster).
+// IsEnemyInRange uses squared distance to avoid sqrt
 func (t *Tower) IsEnemyInRange(enemy *Enemy) bool {
 	dx := t.PositionX - enemy.PositionX
 	dy := t.PositionY - enemy.PositionY
@@ -37,20 +35,16 @@ func (t *Tower) IsEnemyInRange(enemy *Enemy) bool {
 	return distanceSquared <= t.Range*t.Range
 }
 
-// CanFire checks if enough time has passed since the last shot.
-// Respects the tower's FireRate (shots per second).
 func (t *Tower) CanFire(currentTick int) bool {
 	ticksPerShot := int(60.0 / t.FireRate)
 	return currentTick-t.LastFireTime >= ticksPerShot
 }
 
-// Attack creates a projectile that will chase the enemy
 func (t *Tower) Attack(enemy *Enemy) Projectile {
 	return NewProjectile(t.PositionX, t.PositionY, enemy)
 }
 
-// CanPlaceTower validates if a tower can be placed at the position.
-// Checks all corners and center of the tower to ensure it's not on the path.
+// CanPlaceTower ensures tower placement is not on the path
 func CanPlaceTower(centerX, centerY float32, m gamemap.Map) bool {
 	const halfSize = config.TowerSize / 2
 

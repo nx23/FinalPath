@@ -17,7 +17,6 @@ import (
 	"github.com/nx23/final-path/internal/utils"
 )
 
-// Game holds all the game state
 type Game struct {
 	maps                 []gamemap.Map
 	enemies              []*entity.Enemy
@@ -27,18 +26,18 @@ type Game struct {
 	enemiesDefeated      int
 	mousePressed         bool
 	mouseRightPressed    bool
-	tick                 int // Frame counter (60 fps)
+	tick                 int
 	errorMessage         string
 	errorTimer           int
 	hud                  *hud.HUD
-	enemiesPerWave       int     // Number of enemies in current wave
-	enemiesSpawnedInWave int     // Number of enemies spawned in current wave
-	lastSpawnTick        int     // Last tick when an enemy was spawned
-	spawnInterval        int     // Ticks between enemy spawns (60 ticks = 1 second)
-	lives                int     // Player lives
-	coins                int     // Player currency for shop
-	towerDamageBoost     int     // Global damage boost for all towers
-	towerFireRateBoost   float32 // Global fire rate multiplier (1.0 = normal, 1.1 = 10% faster)
+	enemiesPerWave       int
+	enemiesSpawnedInWave int
+	lastSpawnTick        int
+	spawnInterval        int
+	lives                int
+	coins                int
+	towerDamageBoost     int
+	towerFireRateBoost   float32
 	shop                 *shop.Shop
 	gameOverScreen       *gameover.GameOver
 	instructionsScreen   *instructions.Instructions
@@ -56,11 +55,11 @@ func NewGame() *Game {
 		towerLimit:         towerLimit,
 		enemiesDefeated:    0,
 		hud:                hud.NewHUD(towerLimit),
-		spawnInterval:      60, // 1 second between spawns (60 fps * 1)
+		spawnInterval:      60,
 		lives:              initialLives,
-		coins:              50,  // Start with 50 coins
-		towerDamageBoost:   0,   // No damage boost initially
-		towerFireRateBoost: 1.0, // Normal fire rate (1.0x)
+		coins:              50,
+		towerDamageBoost:   0,
+		towerFireRateBoost: 1.0,
 		shop:               shop.NewShop(),
 		gameOverScreen:     gameover.NewGameOver(),
 		instructionsScreen: instructions.NewInstructions(),
@@ -71,11 +70,9 @@ func NewGame() *Game {
 	return g
 }
 
-// Update is called every frame (60x per second) to update the game state
 func (g *Game) Update() error {
 	g.tick++
 
-	// Handle instructions screen
 	if g.instructionsScreen.Active {
 		if g.instructionsScreen.Update() {
 			// Instructions were just closed, consume the click to prevent tower placement
@@ -94,10 +91,8 @@ func (g *Game) Update() error {
 
 	// Update enemy movement only if wave is active
 	if g.hud.WaveActive {
-		// Spawn new enemies at intervals
 		if g.enemiesSpawnedInWave < g.enemiesPerWave {
 			if g.tick-g.lastSpawnTick >= g.spawnInterval || g.enemiesSpawnedInWave == 0 {
-				// Spawn a new enemy
 				g.enemies = append(g.enemies, entity.NewEnemy(g.maps[0]))
 				g.enemiesSpawnedInWave++
 				g.lastSpawnTick = g.tick
@@ -111,26 +106,22 @@ func (g *Game) Update() error {
 			if enemy.IsAlive() {
 				// Check if enemy reached the end of the path
 				if enemy.CurrentPathIndex >= len(g.maps[0]) {
-					// Enemy escaped! Lose a life
 					g.lives--
 					g.hud.Lives = g.lives
 					fmt.Printf("Enemy escaped! Lives remaining: %d\n", g.lives)
 
-					// Check for game over
 					if g.lives <= 0 {
 						g.gameOverScreen.Activate()
 						g.hud.WaveActive = false
 						fmt.Println("Game Over!")
 					}
-					// Don't add to aliveEnemies (despawn)
 				} else {
 					enemy.FollowPath(g.maps[0])
 					aliveEnemies = append(aliveEnemies, enemy)
 				}
 			} else {
-				// Enemy just died
 				g.enemiesDefeated++
-				g.coins += 10 // Award 10 coins per enemy
+				g.coins += 10
 				g.hud.EnemiesDefeated = g.enemiesDefeated
 				g.hud.Coins = g.coins
 				g.hud.EnemiesKilledInWave++
@@ -174,7 +165,7 @@ func (g *Game) Update() error {
 		for i := range g.projectiles {
 			projectile := &g.projectiles[i]
 			if projectile.Hit() {
-				// Projectile hit the target
+
 				if projectile.Target != nil && projectile.Target.IsAlive() {
 					totalDamage := 10 + g.towerDamageBoost
 					projectile.Target.TakeDamage(totalDamage)
@@ -207,13 +198,11 @@ func (g *Game) handleMouseInput() {
 	mousePressedCurrent := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
 	mouseRightPressedCurrent := ebiten.IsMouseButtonPressed(ebiten.MouseButtonRight)
 
-	// Handle left click (place tower, start wave, or shop)
 	if mousePressedCurrent && !g.mousePressed {
 		mx, my := ebiten.CursorPosition()
 
-		// Check if clicking shop button
 		if g.hud.IsShopButtonClicked(mx, my) {
-			g.shop.Toggle() // Toggle shop
+			g.shop.Toggle()
 			fmt.Printf("Shop %s\n", map[bool]string{true: "opened", false: "closed"}[g.shop.Open])
 		} else if g.shop.Open {
 			// Handle shop item clicks
@@ -230,7 +219,7 @@ func (g *Game) handleMouseInput() {
 	// Handle right click (remove tower or close shop)
 	if mouseRightPressedCurrent && !g.mouseRightPressed {
 		if g.shop.Open {
-			g.shop.Close() // Close shop with right click
+			g.shop.Close()
 		} else {
 			mx, my := ebiten.CursorPosition()
 			g.removeTower(float32(mx), float32(my))
@@ -250,7 +239,7 @@ func (g *Game) startNextWave() {
 	// Set number of enemies for this wave (increases with wave number)
 	g.enemiesPerWave = 3 + (g.hud.CurrentWave-1)*2
 	g.enemiesSpawnedInWave = 0
-	g.lastSpawnTick = g.tick - g.spawnInterval // Allow immediate spawn
+	g.lastSpawnTick = g.tick - g.spawnInterval
 
 	// Update HUD with wave info
 	g.hud.EnemiesInWave = g.enemiesPerWave
@@ -259,7 +248,6 @@ func (g *Game) startNextWave() {
 	fmt.Printf("Wave %d started! (%d enemies)\n", g.hud.CurrentWave, g.enemiesPerWave)
 }
 
-// placeTower attempts to place a tower at the given position
 func (g *Game) placeTower(x, y float32) {
 	// Check if clicking in HUD area
 	if y < config.HUDHeight {
@@ -270,11 +258,10 @@ func (g *Game) placeTower(x, y float32) {
 
 	// Check if there's already a tower at this position
 	for _, tower := range g.towers {
-		// Calculate distance between click position and existing tower
 		dx := x - tower.PositionX
 		dy := y - tower.PositionY
-		distance := dx*dx + dy*dy                          // Using squared distance to avoid sqrt
-		minDistance := config.TowerSize * config.TowerSize // Towers can't overlap
+		distance := dx*dx + dy*dy
+		minDistance := config.TowerSize * config.TowerSize
 
 		if distance < minDistance {
 			g.errorMessage = "Cannot place tower on another tower!"
@@ -292,20 +279,15 @@ func (g *Game) placeTower(x, y float32) {
 	}
 }
 
-// removeTower removes a tower at the clicked position
 func (g *Game) removeTower(x, y float32) {
-	// Check if clicking in HUD area
 	if y < config.HUDHeight {
 		return
 	}
 
-	// Find and remove tower at clicked position
 	for i, tower := range g.towers {
-		// Check if click is within tower bounds (using tower size)
 		halfSize := config.TowerSize / 2
 		if x >= tower.PositionX-halfSize && x <= tower.PositionX+halfSize &&
 			y >= tower.PositionY-halfSize && y <= tower.PositionY+halfSize {
-			// Remove tower by swapping with last element and truncating
 			g.towers[i] = g.towers[len(g.towers)-1]
 			g.towers = g.towers[:len(g.towers)-1]
 			g.hud.TowersBuilt = len(g.towers)
@@ -315,36 +297,25 @@ func (g *Game) removeTower(x, y float32) {
 	}
 }
 
-// Draw renders everything on the screen every frame
 func (g *Game) Draw(screen *ebiten.Image) {
-	// Background
 	vector.FillRect(screen, 0, 0, float32(screen.Bounds().Dx()), float32(screen.Bounds().Dy()), color.Black, false)
 
-	// Draw buildable areas
 	renderer.DrawBuildableAreas(screen, g.maps[0])
 
-	// Draw map
 	g.maps[0].Draw(screen)
 
-	// Draw all enemies
 	renderer.DrawEnemies(screen, g.enemies)
 
-	// Draw towers
 	renderer.DrawTowers(screen, g.towers)
 
-	// Draw projectiles
 	renderer.DrawProjectiles(screen, g.projectiles)
 
-	// Draw HUD
 	g.hud.Draw(screen)
 
-	// Draw shop overlay if open
 	g.shop.Draw(screen, g.coins, utils.DrawLargeText)
 
-	// Draw game over screen if game is over
 	g.gameOverScreen.Draw(screen, g.enemiesDefeated, utils.DrawLargeText)
 
-	// Draw instructions overlay if showing
 	g.instructionsScreen.Draw(screen, utils.DrawLargeText)
 
 	// Draw error message (below HUD, larger text)
@@ -394,7 +365,6 @@ func (g *Game) restartGame() {
 	g.hud.Coins = 50
 }
 
-// handleShopClick handles clicks on shop items using the shop package
 func (g *Game) handleShopClick(mx, my int) {
 	itemID, purchased := g.shop.HandleClick(mx, my, g.coins)
 

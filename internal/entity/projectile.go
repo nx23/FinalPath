@@ -2,8 +2,7 @@ package entity
 
 import "math"
 
-// Projectile is a projectile fired by a tower.
-// It automatically chases the enemy until it hits.
+// Projectile chases enemies until hitting them
 type Projectile struct {
 	PositionX float32 // Center X
 	PositionY float32 // Center Y
@@ -11,7 +10,6 @@ type Projectile struct {
 	Target    *Enemy
 }
 
-// NewProjectile creates a projectile that will aim at the enemy
 func NewProjectile(x, y float32, target *Enemy) Projectile {
 	return Projectile{
 		PositionX: x,
@@ -21,8 +19,7 @@ func NewProjectile(x, y float32, target *Enemy) Projectile {
 	}
 }
 
-// Hit moves the projectile towards the target.
-// Returns true when it hits the enemy (distance < speed).
+// Hit returns true when projectile reaches the target
 func (p *Projectile) Hit() bool {
 	if p.Target == nil || !p.Target.IsAlive() {
 		return false
@@ -37,7 +34,7 @@ func (p *Projectile) Hit() bool {
 		// Reached the target
 		return true
 	}
-	
+
 	// Move towards the target
 	p.PositionX += (dx / distance) * float32(p.Speed)
 	p.PositionY += (dy / distance) * float32(p.Speed)

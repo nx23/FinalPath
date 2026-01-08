@@ -8,7 +8,6 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
-// GameOver manages the game over screen and restart functionality
 type GameOver struct {
 	Active              bool
 	RestartButtonX      float32
@@ -18,7 +17,6 @@ type GameOver struct {
 	mousePressed        bool
 }
 
-// NewGameOver creates a new game over screen
 func NewGameOver() *GameOver {
 	return &GameOver{
 		Active:              false,
@@ -40,10 +38,8 @@ func (go_screen *GameOver) Draw(screen *ebiten.Image, enemiesDefeated int, drawT
 	vector.FillRect(screen, 0, 0, float32(screen.Bounds().Dx()), float32(screen.Bounds().Dy()),
 		color.RGBA{0, 0, 0, 200}, false)
 
-	// Game Over text (large)
-	drawTextFunc(screen, "GAME OVER!", 280, 250, 4.0)
+	drawTextFunc(screen, "GAME OVER", 250, 200, 5)
 
-	// Final score
 	scoreText := fmt.Sprintf("Enemies Defeated: %d", enemiesDefeated)
 	drawTextFunc(screen, scoreText, 240, 310, 2.5)
 
@@ -85,7 +81,7 @@ func (go_screen *GameOver) Update() bool {
 	return false
 }
 
-// isRestartButtonClicked checks if the restart button was clicked
+
 func (go_screen *GameOver) isRestartButtonClicked(x, y int) bool {
 	fx, fy := float32(x), float32(y)
 	return fx >= go_screen.RestartButtonX && fx <= go_screen.RestartButtonX+go_screen.RestartButtonWidth &&

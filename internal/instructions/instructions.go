@@ -7,22 +7,18 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
-// Instructions manages the game instructions screen
 type Instructions struct {
 	Active       bool
 	mousePressed bool
 }
 
-// NewInstructions creates a new instructions screen
 func NewInstructions() *Instructions {
 	return &Instructions{
-		Active:       true, // Show on game start
+		Active:       true,
 		mousePressed: false,
 	}
 }
 
-// Update handles input for the instructions screen
-// Returns true if the user clicked to close instructions
 func (i *Instructions) Update() bool {
 	if !i.Active {
 		return false
@@ -41,7 +37,6 @@ func (i *Instructions) Update() bool {
 	return false
 }
 
-// Draw renders the instructions overlay
 func (i *Instructions) Draw(screen *ebiten.Image, drawTextFunc func(*ebiten.Image, string, float64, float64, float64)) {
 	if !i.Active {
 		return

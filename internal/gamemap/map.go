@@ -32,7 +32,6 @@ func DefaultMap() Map {
 	}
 }
 
-// Draw renders the map on the screen
 func (m Map) Draw(screen *ebiten.Image) {
 	for _, path := range m {
 		width := path.EndX - path.StartX

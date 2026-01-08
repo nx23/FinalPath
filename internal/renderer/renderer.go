@@ -11,7 +11,6 @@ import (
 	"github.com/nx23/final-path/internal/utils"
 )
 
-// DrawBuildableAreas draws a green grid showing where towers can be placed
 func DrawBuildableAreas(screen *ebiten.Image, gameMap gamemap.Map) {
 	const gridSize float32 = 40
 	screenWidth := float32(screen.Bounds().Dx())
@@ -24,16 +23,13 @@ func DrawBuildableAreas(screen *ebiten.Image, gameMap gamemap.Map) {
 			centerY := y + gridSize/2
 
 			if !gamemap.IsPositionOnPath(centerX, centerY, gameMap) {
-				// Valid buildable area
 				vector.FillRect(screen, x, y, gridSize, gridSize, color.RGBA{0, 100, 0, 30}, false)
-				// Draw grid border
 				vector.StrokeRect(screen, x, y, gridSize, gridSize, 1, color.RGBA{0, 150, 0, 50}, false)
 			}
 		}
 	}
 }
 
-// DrawEnemies renders all alive enemies on the screen
 func DrawEnemies(screen *ebiten.Image, enemies []*entity.Enemy) {
 	for _, enemy := range enemies {
 		if enemy.IsAlive() {
@@ -43,7 +39,6 @@ func DrawEnemies(screen *ebiten.Image, enemies []*entity.Enemy) {
 	}
 }
 
-// DrawTowers renders all towers with their range circles
 func DrawTowers(screen *ebiten.Image, towers []entity.Tower) {
 	for _, tower := range towers {
 		// Draw range circle centered on tower
@@ -53,7 +48,6 @@ func DrawTowers(screen *ebiten.Image, towers []entity.Tower) {
 	}
 }
 
-// DrawProjectiles renders all projectiles on the screen
 func DrawProjectiles(screen *ebiten.Image, projectiles []entity.Projectile) {
 	for _, projectile := range projectiles {
 		vector.FillCircle(screen, projectile.PositionX, projectile.PositionY, config.ProjectileSize, color.RGBA{255, 255, 0, 255}, false)
