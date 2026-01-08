@@ -1,5 +1,12 @@
 package utils
 
+import (
+	"image"
+
+	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+)
+
 // CenteredPosition helps work with entities that use centered coordinates.
 // Makes it easy to convert between center and top-left for screen drawing.
 type CenteredPosition struct {
@@ -46,4 +53,22 @@ func Max(a, b float32) float32 {
 		return a
 	}
 	return b
+}
+
+// DrawLargeText draws text with actual scaling for better readability
+// This is a shared utility used by HUD, Game, Shop, and GameOver screens
+func DrawLargeText(screen *ebiten.Image, text string, x, y, scale float64) {
+	// Create a temporary image to render text
+	bounds := image.Rect(0, 0, 400, 30)
+	textImg := ebiten.NewImage(bounds.Dx(), bounds.Dy())
+
+	// Draw text on temporary image
+	ebitenutil.DebugPrint(textImg, text)
+
+	// Scale and draw the text image to the screen
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Scale(scale, scale)
+	op.GeoM.Translate(x, y)
+
+	screen.DrawImage(textImg, op)
 }

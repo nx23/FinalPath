@@ -2,13 +2,12 @@ package hud
 
 import (
 	"fmt"
-	"image"
 	"image/color"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/nx23/final-path/internal/config"
+	"github.com/nx23/final-path/internal/utils"
 )
 
 // HUD represents the game's heads-up display
@@ -63,27 +62,27 @@ func (h *HUD) Draw(screen *ebiten.Image) {
 
 	// Tower info
 	towerText := fmt.Sprintf("Towers: %d/%d", h.TowersBuilt, h.TowersLimit)
-	h.drawLargeText(screen, towerText, 20, 20, 2.5)
+	utils.DrawLargeText(screen, towerText, 20, 20, 2.5)
 
 	// Wave progress info (when active)
 	if h.WaveActive {
 		waveProgressText := fmt.Sprintf("Wave %d: %d/%d", h.CurrentWave, h.EnemiesKilledInWave, h.EnemiesInWave)
-		h.drawLargeText(screen, waveProgressText, 280, 20, 2.5)
+		utils.DrawLargeText(screen, waveProgressText, 280, 20, 2.5)
 	}
 
 	// Next wave preview (when not active)
 	if !h.WaveActive && h.EnemiesInWave > 0 {
 		nextWaveText := fmt.Sprintf("Next Wave: %d enemies", h.EnemiesInWave)
-		h.drawLargeText(screen, nextWaveText, 280, 20, 2.5)
+		utils.DrawLargeText(screen, nextWaveText, 280, 20, 2.5)
 	}
 
 	// Enemies defeated info (aligned with wave info)
 	enemyText := fmt.Sprintf("Defeated: %d", h.EnemiesDefeated)
-	h.drawLargeText(screen, enemyText, 280, 65, 2.5)
+	utils.DrawLargeText(screen, enemyText, 280, 65, 2.5)
 
 	// Lives info
 	livesText := fmt.Sprintf("Lives: %d", h.Lives)
-	h.drawLargeText(screen, livesText, 20, 65, 2.5)
+	utils.DrawLargeText(screen, livesText, 20, 65, 2.5)
 
 	// Draw Next Wave button
 	h.drawButton(screen)
@@ -118,7 +117,7 @@ func (h *HUD) drawButton(screen *ebiten.Image) {
 	vector.StrokeRect(screen, h.buttonX, h.buttonY, h.buttonWidth, h.buttonHeight, 3, color.RGBA{255, 255, 255, 255}, false)
 
 	// Draw button text (centered)
-	h.drawLargeText(screen, buttonText, float64(h.buttonX)+9, float64(h.buttonY)+12, 2.2)
+	utils.DrawLargeText(screen, buttonText, float64(h.buttonX)+9, float64(h.buttonY)+12, 2.2)
 }
 
 // IsButtonClicked checks if the button was clicked at the given coordinates
@@ -139,7 +138,7 @@ func (h *HUD) drawShopButton(screen *ebiten.Image) {
 	vector.StrokeRect(screen, h.shopButtonX, h.shopButtonY, h.shopButtonWidth, h.shopButtonHeight, 2, color.RGBA{255, 255, 255, 255}, false)
 
 	// Draw button text
-	h.drawLargeText(screen, "SHOP", float64(h.shopButtonX)+45, float64(h.shopButtonY)+3, 1.5)
+	utils.DrawLargeText(screen, "SHOP", float64(h.shopButtonX)+45, float64(h.shopButtonY)+3, 1.5)
 }
 
 // IsShopButtonClicked checks if the shop button was clicked
@@ -147,21 +146,4 @@ func (h *HUD) IsShopButtonClicked(x, y int) bool {
 	fx, fy := float32(x), float32(y)
 	return fx >= h.shopButtonX && fx <= h.shopButtonX+h.shopButtonWidth &&
 		fy >= h.shopButtonY && fy <= h.shopButtonY+h.shopButtonHeight
-}
-
-// drawLargeText draws text with actual scaling for better readability
-func (h *HUD) drawLargeText(screen *ebiten.Image, text string, x, y, scale float64) {
-	// Create a temporary image to render text
-	bounds := image.Rect(0, 0, 400, 30)
-	textImg := ebiten.NewImage(bounds.Dx(), bounds.Dy())
-
-	// Draw text on temporary image
-	ebitenutil.DebugPrint(textImg, text)
-
-	// Scale and draw the text image to the screen
-	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Scale(scale, scale)
-	op.GeoM.Translate(x, y)
-
-	screen.DrawImage(textImg, op)
 }

@@ -2,11 +2,9 @@ package game
 
 import (
 	"fmt"
-	"image"
 	"image/color"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/nx23/final-path/internal/config"
 	"github.com/nx23/final-path/internal/entity"
@@ -330,14 +328,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.hud.Draw(screen)
 
 	// Draw shop overlay if open
-	g.shop.Draw(screen, g.coins, g.drawLargeText)
+	g.shop.Draw(screen, g.coins, utils.DrawLargeText)
 
 	// Draw game over screen if game is over
-	g.gameOverScreen.Draw(screen, g.enemiesDefeated, g.drawLargeText)
+	g.gameOverScreen.Draw(screen, g.enemiesDefeated, utils.DrawLargeText)
 
 	// Draw error message (below HUD, larger text)
 	if g.errorMessage != "" {
-		g.drawLargeText(screen, g.errorMessage, 20, float64(config.HUDHeight)+10, 1.5)
+		utils.DrawLargeText(screen, g.errorMessage, 20, float64(config.HUDHeight)+10, 1.5)
 	}
 }
 
@@ -401,22 +399,7 @@ func (g *Game) restartGame() {
 	g.hud.Coins = 50
 }
 
-// drawLargeText draws text with actual scaling for better readability
-func (g *Game) drawLargeText(screen *ebiten.Image, text string, x, y, scale float64) {
-	// Create a temporary image to render text
-	bounds := image.Rect(0, 0, 400, 30)
-	textImg := ebiten.NewImage(bounds.Dx(), bounds.Dy())
 
-	// Draw text on temporary image
-	ebitenutil.DebugPrint(textImg, text)
-
-	// Scale and draw the text image to the screen
-	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Scale(scale, scale)
-	op.GeoM.Translate(x, y)
-
-	screen.DrawImage(textImg, op)
-}
 
 // handleShopClick handles clicks on shop items using the shop package
 func (g *Game) handleShopClick(mx, my int) {
