@@ -16,20 +16,21 @@ import (
 
 // Game holds all the game state
 type Game struct {
-	maps               []gamemap.Map
-	enemy              *entity.Enemy
-	towers             []entity.Tower
-	projectiles        []entity.Projectile
-	towerLimit         int
-	enemiesDefeated    int
-	enemyJustDied      bool
-	mousePressed       bool
-	tick               int // Frame counter (60 fps)
-	errorMessage       string
-	errorTimer         int
-	hud                *hud.HUD
-	enemiesPerWave     int // Number of enemies in current wave
+	maps                 []gamemap.Map
+	enemies              []*entity.Enemy
+	towers               []entity.Tower
+	projectiles          []entity.Projectile
+	towerLimit           int
+	enemiesDefeated      int
+	mousePressed         bool
+	tick                 int // Frame counter (60 fps)
+	errorMessage         string
+	errorTimer           int
+	hud                  *hud.HUD
+	enemiesPerWave       int // Number of enemies in current wave
 	enemiesSpawnedInWave int // Number of enemies spawned in current wave
+	lastSpawnTick        int // Last tick when an enemy was spawned
+	spawnInterval        int // Ticks between enemy spawns (60 ticks = 1 second)
 }
 
 // NewGame initializes a new game with the default map
@@ -38,10 +39,11 @@ func NewGame() *Game {
 	towerLimit := 3
 	return &Game{
 		maps:            []gamemap.Map{gameMap},
-		enemy:           entity.NewEnemy(gameMap),
+		enemies:         []*entity.Enemy{},
 		towerLimit:      towerLimit,
 		enemiesDefeated: 0,
 		hud:             hud.NewHUD(towerLimit),
+		spawnInterval:   60, // 1 second between spawns (60 fps * 1)
 	}
 }
 
@@ -51,39 +53,55 @@ func (g *Game) Update() error {
 
 	// Update enemy movement only if wave is active
 	if g.hud.WaveActive {
-		if g.enemy.IsAlive() {
-			g.enemy.FollowPath(g.maps[0])
-			g.enemyJustDied = false
-		} else if !g.enemyJustDied {
-			// Enemy just died
-			g.enemiesDefeated++
-			g.hud.EnemiesDefeated = g.enemiesDefeated
-			g.hud.EnemiesKilledInWave++
-			g.enemyJustDied = true
-			fmt.Printf("Enemy defeated! Total: %d\n", g.enemiesDefeated)
-			
-			// Check if there are more enemies to spawn in this wave
-			if g.enemiesSpawnedInWave < g.enemiesPerWave {
-				// Respawn next enemy in wave
-				g.enemy = entity.NewEnemy(g.maps[0])
+		// Spawn new enemies at intervals
+		if g.enemiesSpawnedInWave < g.enemiesPerWave {
+			if g.tick-g.lastSpawnTick >= g.spawnInterval || g.enemiesSpawnedInWave == 0 {
+				// Spawn a new enemy
+				g.enemies = append(g.enemies, entity.NewEnemy(g.maps[0]))
 				g.enemiesSpawnedInWave++
-			} else {
-				// Wave complete, deactivate it
-				g.hud.WaveActive = false
-				g.hud.EnemiesKilledInWave = 0
-				// Calculate enemies for next wave
-				nextWaveEnemies := 3 + g.hud.CurrentWave * 2
-				g.hud.EnemiesInWave = nextWaveEnemies
-				fmt.Printf("Wave %d complete!\n", g.hud.CurrentWave)
+				g.lastSpawnTick = g.tick
+				fmt.Printf("Enemy spawned! (%d/%d)\n", g.enemiesSpawnedInWave, g.enemiesPerWave)
 			}
 		}
 
-		// Check for tower attacks
+		// Update all enemies
+		var aliveEnemies []*entity.Enemy
+		for _, enemy := range g.enemies {
+			if enemy.IsAlive() {
+				enemy.FollowPath(g.maps[0])
+				aliveEnemies = append(aliveEnemies, enemy)
+			} else {
+				// Enemy just died
+				g.enemiesDefeated++
+				g.hud.EnemiesDefeated = g.enemiesDefeated
+				g.hud.EnemiesKilledInWave++
+				fmt.Printf("Enemy defeated! Total: %d\n", g.enemiesDefeated)
+			}
+		}
+		g.enemies = aliveEnemies
+
+		// Check if wave is complete (all enemies spawned and all dead)
+		if g.enemiesSpawnedInWave >= g.enemiesPerWave && len(g.enemies) == 0 {
+			g.hud.WaveActive = false
+			g.hud.EnemiesKilledInWave = 0
+			// Calculate enemies for next wave
+			nextWaveEnemies := 3 + g.hud.CurrentWave*2
+			g.hud.EnemiesInWave = nextWaveEnemies
+			fmt.Printf("Wave %d complete!\n", g.hud.CurrentWave)
+		}
+
+		// Check for tower attacks on all enemies
 		for i := range g.towers {
 			tower := &g.towers[i]
-			if tower.IsEnemyInRange(g.enemy) && g.enemy.IsAlive() && tower.CanFire(g.tick) {
-				g.projectiles = append(g.projectiles, tower.Attack(g.enemy))
-				tower.LastFireTime = g.tick
+			if tower.CanFire(g.tick) {
+				// Find closest enemy in range
+				for _, enemy := range g.enemies {
+					if tower.IsEnemyInRange(enemy) && enemy.IsAlive() {
+						g.projectiles = append(g.projectiles, tower.Attack(enemy))
+						tower.LastFireTime = g.tick
+						break // Only attack one enemy per tower per fire cycle
+					}
+				}
 			}
 		}
 
@@ -125,7 +143,7 @@ func (g *Game) handleMouseInput() {
 
 	if mousePressedCurrent && !g.mousePressed {
 		mx, my := ebiten.CursorPosition()
-		
+
 		// Check if clicking the Next Wave button
 		if g.hud.IsButtonClicked(mx, my) && !g.hud.WaveActive {
 			g.startNextWave()
@@ -143,17 +161,16 @@ func (g *Game) handleMouseInput() {
 func (g *Game) startNextWave() {
 	g.hud.CurrentWave++
 	g.hud.WaveActive = true
-	
+
 	// Set number of enemies for this wave (increases with wave number)
-	g.enemiesPerWave = 3 + (g.hud.CurrentWave - 1) * 2
-	g.enemiesSpawnedInWave = 1 // First enemy spawns immediately
-	
+	g.enemiesPerWave = 3 + (g.hud.CurrentWave-1)*2
+	g.enemiesSpawnedInWave = 0
+	g.lastSpawnTick = g.tick - g.spawnInterval // Allow immediate spawn
+
 	// Update HUD with wave info
 	g.hud.EnemiesInWave = g.enemiesPerWave
 	g.hud.EnemiesKilledInWave = 0
-	
-	g.enemy = entity.NewEnemy(g.maps[0])
-	g.enemyJustDied = false
+
 	fmt.Printf("Wave %d started! (%d enemies)\n", g.hud.CurrentWave, g.enemiesPerWave)
 }
 
@@ -179,10 +196,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Draw map
 	g.maps[0].Draw(screen)
 
-	// Draw enemy
-	if g.enemy.IsAlive() {
-		topLeftX, topLeftY := utils.CenteredPosition{X: g.enemy.PositionX, Y: g.enemy.PositionY, Size: config.EnemySize}.TopLeft()
-		vector.FillRect(screen, topLeftX, topLeftY, config.EnemySize, config.EnemySize, color.RGBA{255, 0, 0, 255}, false)
+	// Draw all enemies
+	for _, enemy := range g.enemies {
+		if enemy.IsAlive() {
+			topLeftX, topLeftY := utils.CenteredPosition{X: enemy.PositionX, Y: enemy.PositionY, Size: config.EnemySize}.TopLeft()
+			vector.FillRect(screen, topLeftX, topLeftY, config.EnemySize, config.EnemySize, color.RGBA{255, 0, 0, 255}, false)
+		}
 	}
 
 	// Draw towers
