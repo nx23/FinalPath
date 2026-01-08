@@ -20,6 +20,7 @@ type HUD struct {
 	WaveActive          bool
 	EnemiesInWave       int // Total enemies in current/next wave
 	EnemiesKilledInWave int // Enemies killed in current wave
+	Lives               int // Player lives
 	buttonX             float32
 	buttonY             float32
 	buttonWidth         float32
@@ -36,6 +37,7 @@ func NewHUD(towerLimit int) *HUD {
 		WaveActive:          false,
 		EnemiesInWave:       3, // First wave starts with 3 enemies
 		EnemiesKilledInWave: 0,
+		Lives:               10, // Start with 10 lives
 		buttonX:             620,
 		buttonY:             35,
 		buttonWidth:         150,
@@ -65,9 +67,13 @@ func (h *HUD) Draw(screen *ebiten.Image) {
 		h.drawLargeText(screen, nextWaveText, 280, 20, 2.5)
 	}
 
-	// Enemy info
-	enemyText := fmt.Sprintf("Enemies Defeated: %d", h.EnemiesDefeated)
-	h.drawLargeText(screen, enemyText, 20, 65, 2.5)
+	// Enemies defeated info (aligned with wave info)
+	enemyText := fmt.Sprintf("Defeated: %d", h.EnemiesDefeated)
+	h.drawLargeText(screen, enemyText, 280, 65, 2.5)
+
+	// Lives info
+	livesText := fmt.Sprintf("Lives: %d", h.Lives)
+	h.drawLargeText(screen, livesText, 20, 65, 2.5)
 
 	// Draw Next Wave button
 	h.drawButton(screen)
@@ -93,13 +99,13 @@ func (h *HUD) drawButton(screen *ebiten.Image) {
 	}
 
 	// Draw button background
-	vector.DrawFilledRect(screen, h.buttonX, h.buttonY, h.buttonWidth, h.buttonHeight, buttonColor, false)
+	vector.FillRect(screen, h.buttonX, h.buttonY, h.buttonWidth, h.buttonHeight, buttonColor, false)
 
 	// Draw button border
 	vector.StrokeRect(screen, h.buttonX, h.buttonY, h.buttonWidth, h.buttonHeight, 3, color.RGBA{255, 255, 255, 255}, false)
 
 	// Draw button text (centered)
-	h.drawLargeText(screen, buttonText, float64(h.buttonX)+15, float64(h.buttonY)+12, 2.2)
+	h.drawLargeText(screen, buttonText, float64(h.buttonX)+9, float64(h.buttonY)+12, 2.2)
 }
 
 // IsButtonClicked checks if the button was clicked at the given coordinates

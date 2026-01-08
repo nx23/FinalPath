@@ -2,6 +2,7 @@ package game
 
 import (
 	"fmt"
+	"image"
 	"image/color"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -31,25 +32,48 @@ type Game struct {
 	enemiesSpawnedInWave int // Number of enemies spawned in current wave
 	lastSpawnTick        int // Last tick when an enemy was spawned
 	spawnInterval        int // Ticks between enemy spawns (60 ticks = 1 second)
+	lives                int // Player lives
+	gameOver             bool
+	restartButtonX       float32
+	restartButtonY       float32
+	restartButtonWidth   float32
+	restartButtonHeight  float32
 }
 
 // NewGame initializes a new game with the default map
 func NewGame() *Game {
 	gameMap := gamemap.DefaultMap()
 	towerLimit := 3
-	return &Game{
-		maps:            []gamemap.Map{gameMap},
-		enemies:         []*entity.Enemy{},
-		towerLimit:      towerLimit,
-		enemiesDefeated: 0,
-		hud:             hud.NewHUD(towerLimit),
-		spawnInterval:   60, // 1 second between spawns (60 fps * 1)
+	initialLives := 10
+
+	g := &Game{
+		maps:                []gamemap.Map{gameMap},
+		enemies:             []*entity.Enemy{},
+		towerLimit:          towerLimit,
+		enemiesDefeated:     0,
+		hud:                 hud.NewHUD(towerLimit),
+		spawnInterval:       60, // 1 second between spawns (60 fps * 1)
+		lives:               initialLives,
+		gameOver:            false,
+		restartButtonX:      300,
+		restartButtonY:      360,
+		restartButtonWidth:  200,
+		restartButtonHeight: 60,
 	}
+
+	// Sync lives with HUD
+	g.hud.Lives = initialLives
+	return g
 }
 
 // Update is called every frame (60x per second) to update the game state
 func (g *Game) Update() error {
 	g.tick++
+
+	// Handle game over state
+	if g.gameOver {
+		return g.handleGameOverInput()
+	}
 
 	// Update enemy movement only if wave is active
 	if g.hud.WaveActive {
@@ -68,8 +92,24 @@ func (g *Game) Update() error {
 		var aliveEnemies []*entity.Enemy
 		for _, enemy := range g.enemies {
 			if enemy.IsAlive() {
-				enemy.FollowPath(g.maps[0])
-				aliveEnemies = append(aliveEnemies, enemy)
+				// Check if enemy reached the end of the path
+				if enemy.CurrentPathIndex >= len(g.maps[0]) {
+					// Enemy escaped! Lose a life
+					g.lives--
+					g.hud.Lives = g.lives
+					fmt.Printf("Enemy escaped! Lives remaining: %d\n", g.lives)
+
+					// Check for game over
+					if g.lives <= 0 {
+						g.gameOver = true
+						g.hud.WaveActive = false
+						fmt.Println("Game Over!")
+					}
+					// Don't add to aliveEnemies (despawn)
+				} else {
+					enemy.FollowPath(g.maps[0])
+					aliveEnemies = append(aliveEnemies, enemy)
+				}
 			} else {
 				// Enemy just died
 				g.enemiesDefeated++
@@ -176,6 +216,13 @@ func (g *Game) startNextWave() {
 
 // placeTower attempts to place a tower at the given position
 func (g *Game) placeTower(x, y float32) {
+	// Check if clicking in HUD area
+	if y < config.HUDHeight {
+		g.errorMessage = "Cannot place tower in HUD area!"
+		g.errorTimer = 120
+		return
+	}
+
 	if entity.CanPlaceTower(x, y, g.maps[0]) {
 		g.towers = append(g.towers, entity.NewTower(x, y))
 		g.hud.TowersBuilt = len(g.towers)
@@ -220,9 +267,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Draw HUD
 	g.hud.Draw(screen)
 
-	// Draw error message (below HUD)
+	// Draw game over screen if game is over
+	if g.gameOver {
+		g.drawGameOverScreen(screen)
+	}
+
+	// Draw error message (below HUD, larger text)
 	if g.errorMessage != "" {
-		ebitenutil.DebugPrintAt(screen, g.errorMessage, 20, int(config.HUDHeight)+10)
+		g.drawLargeText(screen, g.errorMessage, 20, float64(config.HUDHeight)+10, 1.5)
 	}
 }
 
@@ -251,4 +303,97 @@ func (g *Game) drawBuildableAreas(screen *ebiten.Image) {
 // Layout defines the game's logical screen size (required by ebiten.Game interface)
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
 	return config.Config.Width, config.Config.Height
+}
+
+// handleGameOverInput handles mouse input during game over state
+func (g *Game) handleGameOverInput() error {
+	mousePressedCurrent := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
+
+	if mousePressedCurrent && !g.mousePressed {
+		mx, my := ebiten.CursorPosition()
+
+		// Check if clicking the restart button
+		if g.isRestartButtonClicked(mx, my) {
+			g.restartGame()
+		}
+	}
+
+	g.mousePressed = mousePressedCurrent
+	return nil
+}
+
+// isRestartButtonClicked checks if the restart button was clicked
+func (g *Game) isRestartButtonClicked(x, y int) bool {
+	fx, fy := float32(x), float32(y)
+	return fx >= g.restartButtonX && fx <= g.restartButtonX+g.restartButtonWidth &&
+		fy >= g.restartButtonY && fy <= g.restartButtonY+g.restartButtonHeight
+}
+
+// restartGame resets the game to initial state
+func (g *Game) restartGame() {
+	fmt.Println("Restarting game...")
+	g.enemies = []*entity.Enemy{}
+	g.towers = []entity.Tower{}
+	g.projectiles = []entity.Projectile{}
+	g.enemiesDefeated = 0
+	g.lives = 10
+	g.gameOver = false
+	g.tick = 0
+	g.enemiesPerWave = 0
+	g.enemiesSpawnedInWave = 0
+	g.lastSpawnTick = 0
+	g.errorMessage = ""
+	g.errorTimer = 0
+
+	// Reset HUD
+	g.hud.TowersBuilt = 0
+	g.hud.EnemiesDefeated = 0
+	g.hud.CurrentWave = 0
+	g.hud.WaveActive = false
+	g.hud.EnemiesInWave = 3
+	g.hud.EnemiesKilledInWave = 0
+	g.hud.Lives = 10
+}
+
+// drawGameOverScreen draws the game over overlay with restart button
+func (g *Game) drawGameOverScreen(screen *ebiten.Image) {
+	// Semi-transparent dark overlay
+	vector.FillRect(screen, 0, 0, float32(screen.Bounds().Dx()), float32(screen.Bounds().Dy()),
+		color.RGBA{0, 0, 0, 200}, false)
+
+	// Game Over text (large)
+	g.drawLargeText(screen, "GAME OVER!", 280, 250, 4.0)
+
+	// Final score
+	scoreText := fmt.Sprintf("Enemies Defeated: %d", g.enemiesDefeated)
+	g.drawLargeText(screen, scoreText, 240, 310, 2.5)
+
+	// Restart button
+	buttonColor := color.RGBA{0, 200, 0, 255}
+	vector.FillRect(screen, g.restartButtonX, g.restartButtonY,
+		g.restartButtonWidth, g.restartButtonHeight, buttonColor, false)
+
+	// Button border
+	vector.StrokeRect(screen, g.restartButtonX, g.restartButtonY,
+		g.restartButtonWidth, g.restartButtonHeight, 3, color.RGBA{255, 255, 255, 255}, false)
+
+	// Button text (centered)
+	g.drawLargeText(screen, "RESTART", float64(g.restartButtonX+50), float64(g.restartButtonY+15), 2.5)
+}
+
+// drawLargeText draws text with actual scaling for better readability
+func (g *Game) drawLargeText(screen *ebiten.Image, text string, x, y, scale float64) {
+	// Create a temporary image to render text
+	bounds := image.Rect(0, 0, 400, 30)
+	textImg := ebiten.NewImage(bounds.Dx(), bounds.Dy())
+
+	// Draw text on temporary image
+	ebitenutil.DebugPrint(textImg, text)
+
+	// Scale and draw the text image to the screen
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Scale(scale, scale)
+	op.GeoM.Translate(x, y)
+
+	screen.DrawImage(textImg, op)
 }
