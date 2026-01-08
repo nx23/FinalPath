@@ -35,6 +35,8 @@ type Game struct {
 	spawnInterval        int // Ticks between enemy spawns (60 ticks = 1 second)
 	lives                int // Player lives
 	coins                int // Player currency for shop
+	towerDamageBoost     int // Global damage boost for all towers
+	towerFireRateBoost   float32 // Global fire rate multiplier (1.0 = normal, 1.1 = 10% faster)
 	shop                 *shop.Shop
 	gameOverScreen       *gameover.GameOver
 }
@@ -46,16 +48,18 @@ func NewGame() *Game {
 	initialLives := 10
 
 	g := &Game{
-		maps:            []gamemap.Map{gameMap},
-		enemies:         []*entity.Enemy{},
-		towerLimit:      towerLimit,
-		enemiesDefeated: 0,
-		hud:             hud.NewHUD(towerLimit),
-		spawnInterval:   60, // 1 second between spawns (60 fps * 1)
-		lives:           initialLives,
-		coins:           50, // Start with 50 coins
-		shop:            shop.NewShop(),
-		gameOverScreen:  gameover.NewGameOver(),
+		maps:                []gamemap.Map{gameMap},
+		enemies:             []*entity.Enemy{},
+		towerLimit:          towerLimit,
+		enemiesDefeated:     0,
+		hud:                 hud.NewHUD(towerLimit),
+		spawnInterval:       60, // 1 second between spawns (60 fps * 1)
+		lives:               initialLives,
+		coins:               50,  // Start with 50 coins
+		towerDamageBoost:    0,   // No damage boost initially
+		towerFireRateBoost:  1.0, // Normal fire rate (1.0x)
+		shop:                shop.NewShop(),
+		gameOverScreen:      gameover.NewGameOver(),
 	}
 
 	// Sync lives with HUD
@@ -135,12 +139,17 @@ func (g *Game) Update() error {
 		// Check for tower attacks on all enemies
 		for i := range g.towers {
 			tower := &g.towers[i]
-			if tower.CanFire(g.tick) {
+			// Apply global fire rate boost
+			boostedFireRate := tower.FireRate * g.towerFireRateBoost
+			ticksPerShot := int(60.0 / boostedFireRate)
+			canFire := g.tick-tower.LastFireTime >= ticksPerShot
+			
+			if canFire {
 				// Find closest enemy in range
 				for _, enemy := range g.enemies {
 					if tower.IsEnemyInRange(enemy) && enemy.IsAlive() {
 						g.projectiles = append(g.projectiles, tower.Attack(enemy))
-						tower.LastFireTime = g.tick
+						g.towers[i].LastFireTime = g.tick
 						break // Only attack one enemy per tower per fire cycle
 					}
 				}
@@ -154,8 +163,9 @@ func (g *Game) Update() error {
 			if projectile.Hit() {
 				// Projectile hit the target
 				if projectile.Target != nil && projectile.Target.IsAlive() {
-					projectile.Target.TakeDamage(10)
-					fmt.Printf("Enemy hit! Life: %d\n", projectile.Target.Life)
+					totalDamage := 10 + g.towerDamageBoost
+					projectile.Target.TakeDamage(totalDamage)
+					fmt.Printf("Enemy hit! Damage: %d, Life: %d\n", totalDamage, projectile.Target.Life)
 				}
 			} else if projectile.Target != nil && projectile.Target.IsAlive() {
 				// Projectile still moving
@@ -376,6 +386,8 @@ func (g *Game) restartGame() {
 	g.lives = 10
 	g.coins = 50
 	g.towerLimit = 3
+	g.towerDamageBoost = 0
+	g.towerFireRateBoost = 1.0
 	g.tick = 0
 	g.enemiesPerWave = 0
 	g.enemiesSpawnedInWave = 0
@@ -425,12 +437,12 @@ func (g *Game) handleShopClick(mx, my int) {
 	case 1: // Buy Tower Slot
 		g.towerLimit++
 		fmt.Printf("Bought tower slot! New limit: %d\n", g.towerLimit)
-	case 2: // Upgrade Tower Slot
-		g.towerLimit += 2
-		fmt.Printf("Bought upgraded tower slot! New limit: %d\n", g.towerLimit)
-	case 3: // Extra Life
-		g.lives++
-		fmt.Printf("Bought extra life! Lives: %d\n", g.lives)
+	case 2: // Tower Damage Upgrade
+		g.towerDamageBoost += 10
+		fmt.Printf("Tower damage increased! Total bonus: +%d\n", g.towerDamageBoost)
+	case 4: // Fire Rate Upgrade
+		g.towerFireRateBoost += 0.1
+		fmt.Printf("Tower fire rate increased! Multiplier: %.1fx\n", g.towerFireRateBoost)
 	}
 
 	// Update HUD

@@ -19,11 +19,12 @@ type Tower struct {
 // NewTower creates a tower at the specified position
 func NewTower(x, y float32) Tower {
 	return Tower{
-		PositionX: x,
-		PositionY: y,
-		Range:     100,
-		Damage:    10,
-		FireRate:  1,
+		PositionX:    x,
+		PositionY:    y,
+		Range:        100,
+		Damage:       10,
+		FireRate:     1,
+		LastFireTime: -60, // Start with cooldown ready (1 second ago)
 	}
 }
 

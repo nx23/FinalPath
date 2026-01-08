@@ -37,8 +37,8 @@ func NewShop() *Shop {
 		Height: 320,
 		Items: []ShopItem{
 			{ID: 1, Name: "Buy Tower Slot", Cost: 30, Description: "Add +1 tower slot", Y: 100},
-			{ID: 2, Name: "Upgrade Tower Slot", Cost: 50, Description: "Add +2 tower slots", Y: 160},
-			{ID: 3, Name: "Buy Extra Life", Cost: 40, Description: "Add +1 life", Y: 220},
+			{ID: 2, Name: "Tower Damage +10", Cost: 50, Description: "Increase all tower damage by +10", Y: 160},
+			{ID: 4, Name: "Fire Rate +10%", Cost: 45, Description: "Increase all tower fire rate by 10%", Y: 220},
 		},
 	}
 }
@@ -58,11 +58,11 @@ func (s *Shop) Draw(screen *ebiten.Image, coins int, drawTextFunc func(*ebiten.I
 	vector.StrokeRect(screen, s.X, s.Y, s.Width, s.Height, 3, color.RGBA{255, 165, 0, 255}, false)
 
 	// Title
-	drawTextFunc(screen, "SHOP", 330, 215, 3.0)
+	drawTextFunc(screen, "SHOP", 360, 215, 3.0)
 
 	// Coins display
 	coinsText := fmt.Sprintf("Coins: %d", coins)
-	drawTextFunc(screen, coinsText, 310, 260, 2.0)
+	drawTextFunc(screen, coinsText, 340, 260, 2.0)
 
 	// Draw shop items
 	for _, item := range s.Items {
@@ -70,7 +70,7 @@ func (s *Shop) Draw(screen *ebiten.Image, coins int, drawTextFunc func(*ebiten.I
 	}
 
 	// Close instruction
-	drawTextFunc(screen, "Right-click to close", 260, 490, 1.5)
+	drawTextFunc(screen, "Right-click to close", 320, 600, 1.5)
 }
 
 // drawItem renders a single shop item
