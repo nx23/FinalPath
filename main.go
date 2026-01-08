@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"log"
+	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -12,8 +13,10 @@ import (
 type Game struct {
 	maps         []Map
 	towers       []Tower
+	projectiles  []Projectile
 	towerLimit   int
 	mousePressed bool
+	tick         int // Frame counter
 }
 
 type Window struct {
@@ -40,11 +43,19 @@ type Enemy struct {
 }
 
 type Tower struct {
+	PositionX    float32
+	PositionY    float32
+	Range        float32
+	Damage       int
+	FireRate     float32
+	lastFireTime int
+}
+
+type Projectile struct {
 	PositionX float32
 	PositionY float32
-	Range     float32
-	Damage    int
-	FireRate  float32
+	Speed     int
+	Target    *Enemy
 }
 
 var firstMap = Map{
@@ -66,7 +77,7 @@ var enemy = &Enemy{
 	PositionY:        0,
 	Speed:            2,
 	currentPathIndex: 0,
-	life:             100,
+	life:             40,
 }
 
 func createTower(x, y float32) Tower {
@@ -76,6 +87,15 @@ func createTower(x, y float32) Tower {
 		Range:     100,
 		Damage:    10,
 		FireRate:  1,
+	}
+}
+
+func createProjectile(x, y float32, target *Enemy) Projectile {
+	return Projectile{
+		PositionX: x,
+		PositionY: y,
+		Speed:     10,
+		Target:    target,
 	}
 }
 
@@ -99,6 +119,32 @@ func createMap(screen *ebiten.Image, m Map) {
 	}
 }
 
+func (projectile *Projectile) hit() bool {
+	// Simple straight-line movement towards target
+	if projectile.Target == nil || !projectile.Target.isAlive() {
+		return false
+	}
+
+	// Aim for the center of the enemy (25x25, so center is +12.5 in X and Y)
+	targetCenterX := projectile.Target.PositionX + 12.5
+	targetCenterY := projectile.Target.PositionY + 12.5
+
+	dx := targetCenterX - projectile.PositionX
+	dy := targetCenterY - projectile.PositionY
+	distance := float32(math.Sqrt(float64(dx*dx + dy*dy)))
+
+	if distance < float32(projectile.Speed) {
+		// Reached the target
+		return true
+	} else {
+		// Move towards the target
+		projectile.PositionX += (dx / distance) * float32(projectile.Speed)
+		projectile.PositionY += (dy / distance) * float32(projectile.Speed)
+	}
+
+	return false
+}
+
 func (tower *Tower) isEnemyInRange(enemy *Enemy) bool {
 	dx := tower.PositionX - enemy.PositionX
 	dy := tower.PositionY - enemy.PositionY
@@ -106,16 +152,13 @@ func (tower *Tower) isEnemyInRange(enemy *Enemy) bool {
 	return distanceSquared <= tower.Range*tower.Range
 }
 
-func (tower *Tower) attack(enemy *Enemy) {
-	wasAlive := enemy.isAlive()
-	enemy.life -= tower.Damage
+func (tower *Tower) canFire(currentTick int) bool {
+	ticksPerShot := int(60.0 / tower.FireRate)
+	return currentTick-tower.lastFireTime >= ticksPerShot
+}
 
-	if enemy.life <= 0 && wasAlive {
-		enemy.life = 0
-		fmt.Println("Enemy defeated!")
-	} else if enemy.isAlive() {
-		fmt.Printf("Enemy hit! Remaining life: %d\n", enemy.life)
-	}
+func (tower *Tower) attack(enemy *Enemy) Projectile {
+	return createProjectile(tower.PositionX, tower.PositionY, enemy)
 }
 
 func (enemy *Enemy) isAlive() bool {
@@ -164,16 +207,37 @@ func (enemy *Enemy) followPath(m Map) {
 }
 
 func (g *Game) Update() error {
+	g.tick++
+
 	if enemy.isAlive() {
 		enemy.followPath(firstMap)
 	}
 
 	// Check for tower attacks
-	for _, tower := range g.towers {
-		if tower.isEnemyInRange(enemy) {
-			tower.attack(enemy)
+	for i := range g.towers {
+		tower := &g.towers[i]
+		if tower.isEnemyInRange(enemy) && enemy.isAlive() && tower.canFire(g.tick) {
+			g.projectiles = append(g.projectiles, tower.attack(enemy))
+			tower.lastFireTime = g.tick
 		}
 	}
+
+	// Update projectiles
+	var activeProjectiles []Projectile
+	for i := range g.projectiles {
+		projectile := &g.projectiles[i]
+		if projectile.hit() {
+			// Projectile hit the target
+			if projectile.Target != nil && projectile.Target.isAlive() {
+				projectile.Target.life -= 10
+				fmt.Printf("Enemy hit! Life: %d\n", projectile.Target.life)
+			}
+		} else if projectile.Target != nil && projectile.Target.isAlive() {
+			// Projectile still moving
+			activeProjectiles = append(activeProjectiles, *projectile)
+		}
+	}
+	g.projectiles = activeProjectiles
 
 	// Handle mouse input for placing towers
 	mousePressedCurrent := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
@@ -204,9 +268,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Towers
 	for _, tower := range g.towers {
 		// Draw range circle centered on tower
-		vector.FillCircle(screen, tower.PositionX, tower.PositionY, tower.Range, color.RGBA{0, 0, 255, 20}, false)
-		// Draw tower square (25x25) centered on position
+		vector.StrokeCircle(screen, tower.PositionX, tower.PositionY, tower.Range, 2, color.RGBA{0, 0, 255, 20}, false)
 		vector.FillRect(screen, tower.PositionX-12.5, tower.PositionY-12.5, 25, 25, color.RGBA{0, 255, 255, 255}, false)
+	}
+
+	// Projectiles
+	for _, projectile := range g.projectiles {
+		vector.FillCircle(screen, projectile.PositionX, projectile.PositionY, 5, color.RGBA{255, 255, 0, 255}, false)
 	}
 }
 
@@ -217,7 +285,7 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeigh
 func main() {
 	g := &Game{
 		maps:       []Map{firstMap},
-		towerLimit: 1,
+		towerLimit: 3,
 	}
 	ebiten.SetWindowSize(newWindow.Width, newWindow.Height)
 	ebiten.SetWindowTitle(newWindow.Title)
