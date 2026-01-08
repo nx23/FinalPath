@@ -247,6 +247,21 @@ func (g *Game) placeTower(x, y float32) {
 		return
 	}
 
+	// Check if there's already a tower at this position
+	for _, tower := range g.towers {
+		// Calculate distance between click position and existing tower
+		dx := x - tower.PositionX
+		dy := y - tower.PositionY
+		distance := dx*dx + dy*dy                          // Using squared distance to avoid sqrt
+		minDistance := config.TowerSize * config.TowerSize // Towers can't overlap
+
+		if distance < minDistance {
+			g.errorMessage = "Cannot place tower on another tower!"
+			g.errorTimer = 120
+			return
+		}
+	}
+
 	if entity.CanPlaceTower(x, y, g.maps[0]) {
 		g.towers = append(g.towers, entity.NewTower(x, y))
 		g.hud.TowersBuilt = len(g.towers)
