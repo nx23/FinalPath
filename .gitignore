@@ -1,1 +1,8 @@
 tmp
+final-path
+final-path/.env
+.DS_Store
+final-path/.vscode/
+final-path/bin/
+final-path/build/
+final-path/dist/
