@@ -21,10 +21,15 @@ type HUD struct {
 	EnemiesInWave       int // Total enemies in current/next wave
 	EnemiesKilledInWave int // Enemies killed in current wave
 	Lives               int // Player lives
+	Coins               int // Player currency
 	buttonX             float32
 	buttonY             float32
 	buttonWidth         float32
 	buttonHeight        float32
+	shopButtonX         float32
+	shopButtonY         float32
+	shopButtonWidth     float32
+	shopButtonHeight    float32
 }
 
 // NewHUD creates a new HUD instance
@@ -38,10 +43,15 @@ func NewHUD(towerLimit int) *HUD {
 		EnemiesInWave:       3, // First wave starts with 3 enemies
 		EnemiesKilledInWave: 0,
 		Lives:               10, // Start with 10 lives
+		Coins:               50, // Start with 50 coins
 		buttonX:             620,
 		buttonY:             35,
 		buttonWidth:         150,
 		buttonHeight:        50,
+		shopButtonX:         620,
+		shopButtonY:         90,
+		shopButtonWidth:     150,
+		shopButtonHeight:    25,
 	}
 }
 
@@ -77,6 +87,9 @@ func (h *HUD) Draw(screen *ebiten.Image) {
 
 	// Draw Next Wave button
 	h.drawButton(screen)
+
+	// Draw Shop button
+	h.drawShopButton(screen)
 }
 
 // drawButton draws the "Next Wave" button
@@ -113,6 +126,27 @@ func (h *HUD) IsButtonClicked(x, y int) bool {
 	fx, fy := float32(x), float32(y)
 	return fx >= h.buttonX && fx <= h.buttonX+h.buttonWidth &&
 		fy >= h.buttonY && fy <= h.buttonY+h.buttonHeight
+}
+
+// drawShopButton draws the shop button
+func (h *HUD) drawShopButton(screen *ebiten.Image) {
+	buttonColor := color.RGBA{255, 165, 0, 220} // Orange color
+
+	// Draw button background
+	vector.FillRect(screen, h.shopButtonX, h.shopButtonY, h.shopButtonWidth, h.shopButtonHeight, buttonColor, false)
+
+	// Draw button border
+	vector.StrokeRect(screen, h.shopButtonX, h.shopButtonY, h.shopButtonWidth, h.shopButtonHeight, 2, color.RGBA{255, 255, 255, 255}, false)
+
+	// Draw button text
+	h.drawLargeText(screen, "SHOP", float64(h.shopButtonX)+45, float64(h.shopButtonY)+3, 1.5)
+}
+
+// IsShopButtonClicked checks if the shop button was clicked
+func (h *HUD) IsShopButtonClicked(x, y int) bool {
+	fx, fy := float32(x), float32(y)
+	return fx >= h.shopButtonX && fx <= h.shopButtonX+h.shopButtonWidth &&
+		fy >= h.shopButtonY && fy <= h.shopButtonY+h.shopButtonHeight
 }
 
 // drawLargeText draws text with actual scaling for better readability

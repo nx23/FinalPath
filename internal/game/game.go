@@ -11,7 +11,9 @@ import (
 	"github.com/nx23/final-path/internal/config"
 	"github.com/nx23/final-path/internal/entity"
 	"github.com/nx23/final-path/internal/gamemap"
+	"github.com/nx23/final-path/internal/gameover"
 	"github.com/nx23/final-path/internal/hud"
+	"github.com/nx23/final-path/internal/shop"
 	"github.com/nx23/final-path/internal/utils"
 )
 
@@ -34,11 +36,9 @@ type Game struct {
 	lastSpawnTick        int // Last tick when an enemy was spawned
 	spawnInterval        int // Ticks between enemy spawns (60 ticks = 1 second)
 	lives                int // Player lives
-	gameOver             bool
-	restartButtonX       float32
-	restartButtonY       float32
-	restartButtonWidth   float32
-	restartButtonHeight  float32
+	coins                int // Player currency for shop
+	shop                 *shop.Shop
+	gameOverScreen       *gameover.GameOver
 }
 
 // NewGame initializes a new game with the default map
@@ -48,18 +48,16 @@ func NewGame() *Game {
 	initialLives := 10
 
 	g := &Game{
-		maps:                []gamemap.Map{gameMap},
-		enemies:             []*entity.Enemy{},
-		towerLimit:          towerLimit,
-		enemiesDefeated:     0,
-		hud:                 hud.NewHUD(towerLimit),
-		spawnInterval:       60, // 1 second between spawns (60 fps * 1)
-		lives:               initialLives,
-		gameOver:            false,
-		restartButtonX:      300,
-		restartButtonY:      360,
-		restartButtonWidth:  200,
-		restartButtonHeight: 60,
+		maps:            []gamemap.Map{gameMap},
+		enemies:         []*entity.Enemy{},
+		towerLimit:      towerLimit,
+		enemiesDefeated: 0,
+		hud:             hud.NewHUD(towerLimit),
+		spawnInterval:   60, // 1 second between spawns (60 fps * 1)
+		lives:           initialLives,
+		coins:           50, // Start with 50 coins
+		shop:            shop.NewShop(),
+		gameOverScreen:  gameover.NewGameOver(),
 	}
 
 	// Sync lives with HUD
@@ -72,8 +70,11 @@ func (g *Game) Update() error {
 	g.tick++
 
 	// Handle game over state
-	if g.gameOver {
-		return g.handleGameOverInput()
+	if g.gameOverScreen.Active {
+		if g.gameOverScreen.Update() {
+			g.restartGame()
+		}
+		return nil
 	}
 
 	// Update enemy movement only if wave is active
@@ -102,7 +103,7 @@ func (g *Game) Update() error {
 
 					// Check for game over
 					if g.lives <= 0 {
-						g.gameOver = true
+						g.gameOverScreen.Activate()
 						g.hud.WaveActive = false
 						fmt.Println("Game Over!")
 					}
@@ -114,9 +115,11 @@ func (g *Game) Update() error {
 			} else {
 				// Enemy just died
 				g.enemiesDefeated++
+				g.coins += 10 // Award 10 coins per enemy
 				g.hud.EnemiesDefeated = g.enemiesDefeated
+				g.hud.Coins = g.coins
 				g.hud.EnemiesKilledInWave++
-				fmt.Printf("Enemy defeated! Total: %d\n", g.enemiesDefeated)
+				fmt.Printf("Enemy defeated! Total: %d, Coins: %d\n", g.enemiesDefeated, g.coins)
 			}
 		}
 		g.enemies = aliveEnemies
@@ -183,12 +186,19 @@ func (g *Game) handleMouseInput() {
 	mousePressedCurrent := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
 	mouseRightPressedCurrent := ebiten.IsMouseButtonPressed(ebiten.MouseButtonRight)
 
-	// Handle left click (place tower or start wave)
+	// Handle left click (place tower, start wave, or shop)
 	if mousePressedCurrent && !g.mousePressed {
 		mx, my := ebiten.CursorPosition()
 
-		// Check if clicking the Next Wave button
-		if g.hud.IsButtonClicked(mx, my) && !g.hud.WaveActive {
+		// Check if clicking shop button
+		if g.hud.IsShopButtonClicked(mx, my) {
+			g.shop.Toggle() // Toggle shop
+			fmt.Printf("Shop %s\n", map[bool]string{true: "opened", false: "closed"}[g.shop.Open])
+		} else if g.shop.Open {
+			// Handle shop item clicks
+			g.handleShopClick(mx, my)
+		} else if g.hud.IsButtonClicked(mx, my) && !g.hud.WaveActive {
+			// Check if clicking the Next Wave button
 			g.startNextWave()
 		} else if len(g.towers) < g.towerLimit {
 			// Try to place a tower
@@ -196,10 +206,14 @@ func (g *Game) handleMouseInput() {
 		}
 	}
 
-	// Handle right click (remove tower)
+	// Handle right click (remove tower or close shop)
 	if mouseRightPressedCurrent && !g.mouseRightPressed {
-		mx, my := ebiten.CursorPosition()
-		g.removeTower(float32(mx), float32(my))
+		if g.shop.Open {
+			g.shop.Close() // Close shop with right click
+		} else {
+			mx, my := ebiten.CursorPosition()
+			g.removeTower(float32(mx), float32(my))
+		}
 	}
 
 	// Update mouse pressed states
@@ -300,10 +314,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Draw HUD
 	g.hud.Draw(screen)
 
+	// Draw shop overlay if open
+	g.shop.Draw(screen, g.coins, g.drawLargeText)
+
 	// Draw game over screen if game is over
-	if g.gameOver {
-		g.drawGameOverScreen(screen)
-	}
+	g.gameOverScreen.Draw(screen, g.enemiesDefeated, g.drawLargeText)
 
 	// Draw error message (below HUD, larger text)
 	if g.errorMessage != "" {
@@ -338,31 +353,7 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeigh
 	return config.Config.Width, config.Config.Height
 }
 
-// handleGameOverInput handles mouse input during game over state
-func (g *Game) handleGameOverInput() error {
-	mousePressedCurrent := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
-
-	if mousePressedCurrent && !g.mousePressed {
-		mx, my := ebiten.CursorPosition()
-
-		// Check if clicking the restart button
-		if g.isRestartButtonClicked(mx, my) {
-			g.restartGame()
-		}
-	}
-
-	g.mousePressed = mousePressedCurrent
-	return nil
-}
-
-// isRestartButtonClicked checks if the restart button was clicked
-func (g *Game) isRestartButtonClicked(x, y int) bool {
-	fx, fy := float32(x), float32(y)
-	return fx >= g.restartButtonX && fx <= g.restartButtonX+g.restartButtonWidth &&
-		fy >= g.restartButtonY && fy <= g.restartButtonY+g.restartButtonHeight
-}
-
-// restartGame resets the game to initial state
+// drawShop draws the shop overlay
 func (g *Game) restartGame() {
 	fmt.Println("Restarting game...")
 	g.enemies = []*entity.Enemy{}
@@ -370,7 +361,8 @@ func (g *Game) restartGame() {
 	g.projectiles = []entity.Projectile{}
 	g.enemiesDefeated = 0
 	g.lives = 10
-	g.gameOver = false
+	g.coins = 50
+	g.towerLimit = 3
 	g.tick = 0
 	g.enemiesPerWave = 0
 	g.enemiesSpawnedInWave = 0
@@ -378,40 +370,20 @@ func (g *Game) restartGame() {
 	g.errorMessage = ""
 	g.errorTimer = 0
 
+	// Reset shop and game over screen
+	g.shop.Close()
+	g.gameOverScreen.Reset()
+
 	// Reset HUD
 	g.hud.TowersBuilt = 0
+	g.hud.TowersLimit = 3
 	g.hud.EnemiesDefeated = 0
 	g.hud.CurrentWave = 0
 	g.hud.WaveActive = false
 	g.hud.EnemiesInWave = 3
 	g.hud.EnemiesKilledInWave = 0
 	g.hud.Lives = 10
-}
-
-// drawGameOverScreen draws the game over overlay with restart button
-func (g *Game) drawGameOverScreen(screen *ebiten.Image) {
-	// Semi-transparent dark overlay
-	vector.FillRect(screen, 0, 0, float32(screen.Bounds().Dx()), float32(screen.Bounds().Dy()),
-		color.RGBA{0, 0, 0, 200}, false)
-
-	// Game Over text (large)
-	g.drawLargeText(screen, "GAME OVER!", 280, 250, 4.0)
-
-	// Final score
-	scoreText := fmt.Sprintf("Enemies Defeated: %d", g.enemiesDefeated)
-	g.drawLargeText(screen, scoreText, 240, 310, 2.5)
-
-	// Restart button
-	buttonColor := color.RGBA{0, 200, 0, 255}
-	vector.FillRect(screen, g.restartButtonX, g.restartButtonY,
-		g.restartButtonWidth, g.restartButtonHeight, buttonColor, false)
-
-	// Button border
-	vector.StrokeRect(screen, g.restartButtonX, g.restartButtonY,
-		g.restartButtonWidth, g.restartButtonHeight, 3, color.RGBA{255, 255, 255, 255}, false)
-
-	// Button text (centered)
-	g.drawLargeText(screen, "RESTART", float64(g.restartButtonX+50), float64(g.restartButtonY+15), 2.5)
+	g.hud.Coins = 50
 }
 
 // drawLargeText draws text with actual scaling for better readability
@@ -429,4 +401,42 @@ func (g *Game) drawLargeText(screen *ebiten.Image, text string, x, y, scale floa
 	op.GeoM.Translate(x, y)
 
 	screen.DrawImage(textImg, op)
+}
+
+// handleShopClick handles clicks on shop items using the shop package
+func (g *Game) handleShopClick(mx, my int) {
+	itemID, purchased := g.shop.HandleClick(mx, my, g.coins)
+
+	if !purchased || itemID == 0 {
+		return
+	}
+
+	// Get the cost of the item
+	var cost int
+	for _, item := range g.shop.Items {
+		if item.ID == itemID {
+			cost = item.Cost
+			break
+		}
+	}
+
+	// Deduct cost and apply effect
+	g.coins -= cost
+
+	switch itemID {
+	case 1: // Buy Tower Slot
+		g.towerLimit++
+		fmt.Printf("Bought tower slot! New limit: %d\n", g.towerLimit)
+	case 2: // Upgrade Tower Slot
+		g.towerLimit += 2
+		fmt.Printf("Bought upgraded tower slot! New limit: %d\n", g.towerLimit)
+	case 3: // Extra Life
+		g.lives++
+		fmt.Printf("Bought extra life! Lives: %d\n", g.lives)
+	}
+
+	// Update HUD
+	g.hud.Coins = g.coins
+	g.hud.TowersLimit = g.towerLimit
+	g.hud.Lives = g.lives
 }
