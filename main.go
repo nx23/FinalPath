@@ -11,6 +11,47 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
+// Constants for entity sizes
+const (
+	EnemySize      float32 = 25
+	TowerSize      float32 = 25
+	PathWidth      float32 = 50
+	ProjectileSize float32 = 5
+)
+
+// Centered position helper - returns the top-left corner coordinates
+// for an entity of given size that should be centered at (x, y)
+type CenteredPosition struct {
+	X    float32
+	Y    float32
+	Size float32
+}
+
+// TopLeft returns the top-left corner coordinates for drawing
+func (cp CenteredPosition) TopLeft() (float32, float32) {
+	halfSize := cp.Size / 2
+	return cp.X - halfSize, cp.Y - halfSize
+}
+
+// Center returns the center coordinates
+func (cp CenteredPosition) Center() (float32, float32) {
+	return cp.X, cp.Y
+}
+
+// Helper to get center from top-left position and size
+func getCenterFromTopLeft(topLeftX, topLeftY, size float32) (float32, float32) {
+	halfSize := size / 2
+	return topLeftX + halfSize, topLeftY + halfSize
+}
+
+// Helper to center an entity in a path
+// pathPos is the start position of the path (e.g., StartX or StartY)
+// pathWidth is the width of the path (e.g., 50)
+// Returns the center position of the path
+func centerInPath(pathPos float32, pathWidth float32) float32 {
+	return pathPos + pathWidth/2
+}
+
 type Game struct {
 	maps         []Map
 	towers       []Tower
@@ -38,16 +79,16 @@ type Path struct {
 type Map []Path
 
 type Enemy struct {
-	PositionX        float32
-	PositionY        float32
+	PositionX        float32 // This is the CENTER position
+	PositionY        float32 // This is the CENTER position
 	Speed            float32
 	currentPathIndex int
 	life             int
 }
 
 type Tower struct {
-	PositionX    float32
-	PositionY    float32
+	PositionX    float32 // This is the CENTER position
+	PositionY    float32 // This is the CENTER position
 	Range        float32
 	Damage       int
 	FireRate     float32
@@ -55,8 +96,8 @@ type Tower struct {
 }
 
 type Projectile struct {
-	PositionX float32
-	PositionY float32
+	PositionX float32 // This is the CENTER position
+	PositionY float32 // This is the CENTER position
 	Speed     int
 	Target    *Enemy
 }
@@ -76,8 +117,8 @@ var newWindow = Window{
 }
 
 var enemy = &Enemy{
-	PositionX:        362.5, // Centered in the path (350 + 12.5)
-	PositionY:        0,
+	PositionX:        centerInPath(350, PathWidth), // Automatically centered in the path
+	PositionY:        centerInPath(0, PathWidth),   // Also center in Y
 	Speed:            2,
 	currentPathIndex: 0,
 	life:             40,
@@ -94,14 +135,13 @@ func createTower(x, y float32) Tower {
 }
 
 func isPositionOnPath(x, y float32, m Map) bool {
-	const pathWidth float32 = 50
 	const margin float32 = 30
 
 	for _, path := range m {
 		minX := min(path.StartX, path.EndX) - margin
-		maxX := max(path.StartX, path.EndX) + pathWidth + margin
+		maxX := max(path.StartX, path.EndX) + PathWidth + margin
 		minY := min(path.StartY, path.EndY) - margin
-		maxY := max(path.StartY, path.EndY) + pathWidth + margin
+		maxY := max(path.StartY, path.EndY) + PathWidth + margin
 
 		if x >= minX && x <= maxX && y >= minY && y <= maxY {
 			return true
@@ -112,8 +152,7 @@ func isPositionOnPath(x, y float32, m Map) bool {
 }
 
 func canPlaceTower(centerX, centerY float32, m Map) bool {
-	const towerSize float32 = 25
-	const halfSize = towerSize / 2
+	const halfSize = TowerSize / 2
 
 	// Verify all four corners and center of the tower area
 	points := []struct{ x, y float32 }{
@@ -158,19 +197,18 @@ func createProjectile(x, y float32, target *Enemy) Projectile {
 }
 
 func createMap(screen *ebiten.Image, m Map) {
-	const pathWidth float32 = 50
 	for _, path := range m {
 		width := path.EndX - path.StartX
 		height := path.EndY - path.StartY
 
-		// If vertical path (width is 0), add pathWidth
+		// If vertical path (width is 0), add PathWidth
 		if width == 0 {
-			width = pathWidth
+			width = PathWidth
 		}
 
-		// If horizontal path (height is 0), add pathWidth
+		// If horizontal path (height is 0), add PathWidth
 		if height == 0 {
-			height = pathWidth
+			height = PathWidth
 		}
 
 		vector.FillRect(screen, path.StartX, path.StartY, width, height, color.White, false)
@@ -204,12 +242,9 @@ func (projectile *Projectile) hit() bool {
 		return false
 	}
 
-	// Aim for the center of the enemy (25x25, so center is +12.5 in X and Y)
-	targetCenterX := projectile.Target.PositionX + 12.5
-	targetCenterY := projectile.Target.PositionY + 12.5
-
-	dx := targetCenterX - projectile.PositionX
-	dy := targetCenterY - projectile.PositionY
+	// Both positions are already center coordinates, no need to adjust
+	dx := projectile.Target.PositionX - projectile.PositionX
+	dy := projectile.Target.PositionY - projectile.PositionY
 	distance := float32(math.Sqrt(float64(dx*dx + dy*dy)))
 
 	if distance < float32(projectile.Speed) {
@@ -249,25 +284,31 @@ func (enemy *Enemy) followPath(m Map) {
 		return
 	}
 
-	const pathWidth float32 = 50
-	const enemySize float32 = 25
-	const offset = (pathWidth - enemySize) / 2 // Center offset: 12.5
-
 	path := m[enemy.currentPathIndex]
 
 	// Vertical movement
 	if path.StartX == path.EndX {
-		if enemy.PositionY-offset < path.EndY {
+		// Center the enemy on X axis for this vertical path
+		targetCenterX := centerInPath(path.StartX, PathWidth)
+		enemy.PositionX = targetCenterX
+
+		targetCenterY := centerInPath(path.EndY, PathWidth)
+		if enemy.PositionY < targetCenterY {
 			enemy.PositionY += enemy.Speed
 		} else {
 			enemy.currentPathIndex++
 			fmt.Printf("Path %d completed\n", enemy.currentPathIndex)
 		}
 	} else if path.StartY == path.EndY { // Horizontal movement
+		// Center the enemy on Y axis for this horizontal path
+		targetCenterY := centerInPath(path.StartY, PathWidth)
+		enemy.PositionY = targetCenterY
+
 		// Move right or left depending on direction
 		if path.EndX > path.StartX {
 			// Move right
-			if enemy.PositionX-offset < path.EndX {
+			targetCenterX := centerInPath(path.EndX, PathWidth)
+			if enemy.PositionX < targetCenterX {
 				enemy.PositionX += enemy.Speed
 			} else {
 				enemy.currentPathIndex++
@@ -275,7 +316,8 @@ func (enemy *Enemy) followPath(m Map) {
 			}
 		} else {
 			// Move left
-			if enemy.PositionX-offset > path.EndX {
+			targetCenterX := centerInPath(path.EndX, PathWidth)
+			if enemy.PositionX > targetCenterX {
 				enemy.PositionX -= enemy.Speed
 			} else {
 				enemy.currentPathIndex++
@@ -356,21 +398,23 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Map
 	createMap(screen, g.maps[0])
 
-	// Enemy
+	// Enemy (draw using center position)
 	if enemy.isAlive() {
-		vector.FillRect(screen, enemy.PositionX, enemy.PositionY, 25, 25, color.RGBA{255, 0, 0, 255}, false)
+		topLeftX, topLeftY := CenteredPosition{X: enemy.PositionX, Y: enemy.PositionY, Size: EnemySize}.TopLeft()
+		vector.FillRect(screen, topLeftX, topLeftY, EnemySize, EnemySize, color.RGBA{255, 0, 0, 255}, false)
 	}
 
-	// Towers
+	// Towers (draw using center position)
 	for _, tower := range g.towers {
 		// Draw range circle centered on tower
 		vector.StrokeCircle(screen, tower.PositionX, tower.PositionY, tower.Range, 2, color.RGBA{0, 0, 255, 20}, false)
-		vector.FillRect(screen, tower.PositionX-12.5, tower.PositionY-12.5, 25, 25, color.RGBA{0, 255, 255, 255}, false)
+		topLeftX, topLeftY := CenteredPosition{X: tower.PositionX, Y: tower.PositionY, Size: TowerSize}.TopLeft()
+		vector.FillRect(screen, topLeftX, topLeftY, TowerSize, TowerSize, color.RGBA{0, 255, 255, 255}, false)
 	}
 
-	// Projectiles
+	// Projectiles (draw centered)
 	for _, projectile := range g.projectiles {
-		vector.FillCircle(screen, projectile.PositionX, projectile.PositionY, 5, color.RGBA{255, 255, 0, 255}, false)
+		vector.FillCircle(screen, projectile.PositionX, projectile.PositionY, ProjectileSize, color.RGBA{255, 255, 0, 255}, false)
 	}
 
 	// Error message
