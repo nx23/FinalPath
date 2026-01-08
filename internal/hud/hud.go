@@ -49,18 +49,21 @@ func (h *HUD) Draw(screen *ebiten.Image) {
 	screenWidth := float32(screen.Bounds().Dx())
 	vector.FillRect(screen, 0, 0, screenWidth, config.HUDHeight, color.RGBA{0, 0, 0, 255}, false)
 
-	// Tower info with wave enemies preview
+	// Tower info
 	towerText := fmt.Sprintf("Towers: %d/%d", h.TowersBuilt, h.TowersLimit)
 	h.drawLargeText(screen, towerText, 20, 20, 2.5)
 
-	// Wave enemies info (next to towers)
-	var waveEnemiesText string
+	// Wave progress info (when active)
 	if h.WaveActive {
-		waveEnemiesText = fmt.Sprintf("Wave %d: %d/%d", h.CurrentWave, h.EnemiesKilledInWave, h.EnemiesInWave)
-	} else {
-		waveEnemiesText = fmt.Sprintf("Next Wave: %d enemies", h.EnemiesInWave)
+		waveProgressText := fmt.Sprintf("Wave %d: %d/%d", h.CurrentWave, h.EnemiesKilledInWave, h.EnemiesInWave)
+		h.drawLargeText(screen, waveProgressText, 280, 20, 2.5)
 	}
-	h.drawLargeText(screen, waveEnemiesText, 280, 20, 2.5)
+
+	// Next wave preview (when not active)
+	if !h.WaveActive && h.EnemiesInWave > 0 {
+		nextWaveText := fmt.Sprintf("Next Wave: %d enemies", h.EnemiesInWave)
+		h.drawLargeText(screen, nextWaveText, 280, 20, 2.5)
+	}
 
 	// Enemy info
 	enemyText := fmt.Sprintf("Enemies Defeated: %d", h.EnemiesDefeated)
