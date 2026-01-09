@@ -18,55 +18,59 @@ import (
 )
 
 type Game struct {
-	maps                 []gamemap.Map
-	enemies              []*entity.Enemy
-	towers               []entity.Tower
-	projectiles          []entity.Projectile
-	towerLimit           int
-	enemiesDefeated      int
-	mousePressed         bool
-	mouseRightPressed    bool
-	tick                 int
-	errorMessage         string
-	errorTimer           int
-	hud                  *hud.HUD
-	enemiesPerWave       int
-	enemiesSpawnedInWave int
-	lastSpawnTick        int
-	spawnInterval        int
-	lives                int
-	coins                int
-	towerDamageBoost     int
-	towerFireRateBoost   float32
-	shop                 *shop.Shop
-	gameOverScreen       *gameover.GameOver
-	instructionsScreen   *instructions.Instructions
+	maps                   []gamemap.Map
+	enemies                []*entity.Enemy
+	towers                 []entity.Tower
+	projectiles            []entity.Projectile
+	towerLimit             int
+	towerCost              int
+	towerRefund            int
+	enemiesDefeated        int
+	difficultyModifier     int
+	mousePressed           bool
+	mouseRightPressed      bool
+	tick                   int
+	errorMessage           string
+	errorTimer             int
+	hud                    *hud.HUD
+	enemiesPerWave         int
+	enemiesSpawnedInWave   int
+	lastSpawnTick          int
+	spawnInterval          int
+	lives                  int
+	coins                  int
+	towerDamageBoost       int
+	towerDamageBoostCost   int
+	towerFireRateBoost     float32
+	towerFireRateBoostCost int
+	shop                   *shop.Shop
+	gameOverScreen         *gameover.GameOver
+	instructionsScreen     *instructions.Instructions
 }
 
 // NewGame initializes a new game with the default map
 func NewGame() *Game {
 	gameMap := gamemap.DefaultMap()
-	towerLimit := 3
-	initialLives := 10
 
 	g := &Game{
 		maps:               []gamemap.Map{gameMap},
 		enemies:            []*entity.Enemy{},
-		towerLimit:         towerLimit,
-		enemiesDefeated:    0,
-		hud:                hud.NewHUD(towerLimit),
-		spawnInterval:      60,
-		lives:              initialLives,
-		coins:              50,
-		towerDamageBoost:   0,
-		towerFireRateBoost: 1.0,
+		towerLimit:         config.GameConstants.TowerLimit,
+		towerCost:          config.GameConstants.InitialTowerCost,
+		towerRefund:        config.GameConstants.InitialTowerRefund,
+		enemiesDefeated:    config.GameConstants.EnemiesDefeated,
+		difficultyModifier: config.GameConstants.DifficultyModifier,
+		hud:                hud.NewHUD(config.GameConstants.TowerLimit, config.GameConstants.InitialTowerCost, config.GameConstants.InitialTowerRefund, config.GameConstants.InitialLives, config.GameConstants.InitialCoins),
+		spawnInterval:      config.GameConstants.SpawnInterval,
+		lives:              config.GameConstants.InitialLives,
+		coins:              config.GameConstants.InitialCoins,
+		towerDamageBoost:   config.GameConstants.TowerDamageBoost,
+		towerFireRateBoost: config.GameConstants.TowerFireRateBoost,
 		shop:               shop.NewShop(),
 		gameOverScreen:     gameover.NewGameOver(),
 		instructionsScreen: instructions.NewInstructions(),
 	}
 
-	// Sync lives with HUD
-	g.hud.Lives = initialLives
 	return g
 }
 
@@ -93,7 +97,11 @@ func (g *Game) Update() error {
 	if g.hud.WaveActive {
 		if g.enemiesSpawnedInWave < g.enemiesPerWave {
 			if g.tick-g.lastSpawnTick >= g.spawnInterval || g.enemiesSpawnedInWave == 0 {
-				g.enemies = append(g.enemies, entity.NewEnemy(g.maps[0]))
+				g.enemies = append(g.enemies, entity.NewEnemy(entity.NewEnemyParams{
+					Map:   g.maps[0],
+					Speed: 2 * (1 + float32(g.hud.CurrentWave-1)*0.1),
+					Life:  10 + (1 + (g.hud.CurrentWave-1)*2) + (20 * g.difficultyModifier),
+				}))
 				g.enemiesSpawnedInWave++
 				g.lastSpawnTick = g.tick
 				fmt.Printf("Enemy spawned! (%d/%d)\n", g.enemiesSpawnedInWave, g.enemiesPerWave)
@@ -121,7 +129,7 @@ func (g *Game) Update() error {
 				}
 			} else {
 				g.enemiesDefeated++
-				g.coins += 10
+				g.coins += 5
 				g.hud.EnemiesDefeated = g.enemiesDefeated
 				g.hud.Coins = g.coins
 				g.hud.EnemiesKilledInWave++
@@ -135,7 +143,7 @@ func (g *Game) Update() error {
 			g.hud.WaveActive = false
 			g.hud.EnemiesKilledInWave = 0
 			// Calculate enemies for next wave
-			nextWaveEnemies := 3 + g.hud.CurrentWave*2
+			nextWaveEnemies := 3 + g.hud.CurrentWave*2 + (g.difficultyModifier-1)*2
 			g.hud.EnemiesInWave = nextWaveEnemies
 			fmt.Printf("Wave %d complete!\n", g.hud.CurrentWave)
 		}
@@ -210,10 +218,11 @@ func (g *Game) handleMouseInput() {
 		} else if g.hud.IsButtonClicked(mx, my) && !g.hud.WaveActive {
 			// Check if clicking the Next Wave button
 			g.startNextWave()
-		} else if len(g.towers) < g.towerLimit {
+		} else {
 			// Try to place a tower
 			g.placeTower(float32(mx), float32(my))
 		}
+
 	}
 
 	// Handle right click (remove tower or close shop)
@@ -239,7 +248,13 @@ func (g *Game) startNextWave() {
 	// Set number of enemies for this wave (increases with wave number)
 	g.enemiesPerWave = 3 + (g.hud.CurrentWave-1)*2
 	g.enemiesSpawnedInWave = 0
-	g.lastSpawnTick = g.tick - g.spawnInterval
+	g.lastSpawnTick = g.tick - g.spawnInterval - (g.hud.CurrentWave * 2)
+
+	// Update difficulty modifier every 5 waves
+	if g.hud.CurrentWave%5 == 0 {
+		g.difficultyModifier++
+		fmt.Printf("Difficulty increased! Modifier: %d\n", g.difficultyModifier)
+	}
 
 	// Update HUD with wave info
 	g.hud.EnemiesInWave = g.enemiesPerWave
@@ -270,13 +285,33 @@ func (g *Game) placeTower(x, y float32) {
 		}
 	}
 
-	if entity.CanPlaceTower(x, y, g.maps[0]) {
-		g.towers = append(g.towers, entity.NewTower(x, y))
-		g.hud.TowersBuilt = len(g.towers)
-	} else {
+	// Check if tower limit reached
+	if len(g.towers) >= g.towerLimit {
+		g.errorMessage = "Tower limit reached! Buy more slots in the shop."
+		g.errorTimer = 120
+		return
+	}
+
+	// Check if has enough coins
+	if g.coins < g.hud.TowerCost {
+		g.errorMessage = "Not enough coins to place tower!"
+		g.errorTimer = 120
+		return
+	}
+
+	// Validate tower placement (not on path)
+	if !entity.CanPlaceTower(x, y, g.maps[0]) {
 		g.errorMessage = "Cannot place tower on path!"
 		g.errorTimer = 120
+		return
 	}
+
+	// Deduct coins and place tower
+	g.coins -= g.hud.TowerCost
+	g.hud.Coins = g.coins
+	fmt.Printf("Tower placed at (%.1f, %.1f)! Coins left: %d\n", x, y, g.coins)
+	g.towers = append(g.towers, entity.NewTower(x, y))
+	g.hud.TowersBuilt = len(g.towers)
 }
 
 func (g *Game) removeTower(x, y float32) {
@@ -288,6 +323,12 @@ func (g *Game) removeTower(x, y float32) {
 		halfSize := config.TowerSize / 2
 		if x >= tower.PositionX-halfSize && x <= tower.PositionX+halfSize &&
 			y >= tower.PositionY-halfSize && y <= tower.PositionY+halfSize {
+
+			// Refund half the tower cost
+			g.coins += g.towerRefund
+			g.hud.Coins = g.coins
+
+			// Remove tower
 			g.towers[i] = g.towers[len(g.towers)-1]
 			g.towers = g.towers[:len(g.towers)-1]
 			g.hud.TowersBuilt = len(g.towers)
@@ -336,11 +377,13 @@ func (g *Game) restartGame() {
 	g.towers = []entity.Tower{}
 	g.projectiles = []entity.Projectile{}
 	g.enemiesDefeated = 0
-	g.lives = 10
-	g.coins = 50
-	g.towerLimit = 3
-	g.towerDamageBoost = 0
-	g.towerFireRateBoost = 1.0
+	g.lives = config.GameConstants.InitialLives
+	g.coins = config.GameConstants.InitialCoins
+	g.towerLimit = config.GameConstants.TowerLimit
+	g.towerDamageBoost = config.GameConstants.TowerDamageBoost
+	g.towerFireRateBoost = config.GameConstants.TowerFireRateBoost
+	g.difficultyModifier = 1
+	g.spawnInterval = config.GameConstants.SpawnInterval
 	g.tick = 0
 	g.enemiesPerWave = 0
 	g.enemiesSpawnedInWave = 0
@@ -350,25 +393,18 @@ func (g *Game) restartGame() {
 
 	// Reset shop and game over screen
 	g.shop.Close()
+	g.shop = shop.NewShop()
 	g.gameOverScreen.Reset()
 	g.instructionsScreen.Hide()
 
 	// Reset HUD
-	g.hud.TowersBuilt = 0
-	g.hud.TowersLimit = 3
-	g.hud.EnemiesDefeated = 0
-	g.hud.CurrentWave = 0
-	g.hud.WaveActive = false
-	g.hud.EnemiesInWave = 3
-	g.hud.EnemiesKilledInWave = 0
-	g.hud.Lives = 10
-	g.hud.Coins = 50
+	g.hud = hud.NewHUD(g.towerLimit, config.GameConstants.InitialTowerCost, config.GameConstants.InitialTowerRefund, config.GameConstants.InitialLives, config.GameConstants.InitialCoins)
 }
 
 func (g *Game) handleShopClick(mx, my int) {
 	itemID, purchased := g.shop.HandleClick(mx, my, g.coins)
 
-	if !purchased || itemID == 0 {
+	if !purchased {
 		return
 	}
 
@@ -382,10 +418,14 @@ func (g *Game) handleShopClick(mx, my int) {
 		g.towerLimit = newTowerLimit
 		g.towerDamageBoost = newDamageBoost
 		g.towerFireRateBoost = newFireRateBoost
+		g.towerCost = 5 * newTowerLimit
+		g.towerRefund = 3 * newTowerLimit
 
 		// Update HUD
 		g.hud.Coins = g.coins
 		g.hud.TowersLimit = g.towerLimit
+		g.hud.TowerCost = g.towerCost
+		g.hud.TowerRefund = g.towerRefund
 
 		// Log purchase
 		switch itemID {
