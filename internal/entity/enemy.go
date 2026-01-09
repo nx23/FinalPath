@@ -18,18 +18,24 @@ type Enemy struct {
 	Life             int
 }
 
-func NewEnemy(m gamemap.Map) *Enemy {
-	if len(m) == 0 {
+type NewEnemyParams struct {
+	Map   gamemap.Map
+	Speed float32
+	Life  int
+}
+
+func NewEnemy(params NewEnemyParams) *Enemy {
+	if len(params.Map) == 0 {
 		return &Enemy{}
 	}
 
-	firstPath := m[0]
+	firstPath := params.Map[0]
 	return &Enemy{
 		PositionX:        utils.CenterInPath(firstPath.StartX, config.PathWidth),
 		PositionY:        utils.CenterInPath(firstPath.StartY, config.PathWidth),
-		Speed:            2,
+		Speed:            params.Speed,
 		CurrentPathIndex: 0,
-		Life:             40,
+		Life:             params.Life,
 	}
 }
 
