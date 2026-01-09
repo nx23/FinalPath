@@ -58,21 +58,22 @@ FinalPath/
 Prevent enemies from reaching the end of the path by strategically placing defensive towers.
 
 ### Controls
-- **Left Click**: Place tower or interact with shop/buttons
-- **Right Click**: Remove tower (costs 5 coins)
+- **Left Click**: Place tower (15 coins) or interact with shop/buttons
+- **Right Click**: Remove tower (refunds 10 coins)
 - **Mouse**: Navigate menus and UI
 
 ### Game Mechanics
 - **Starting Resources**: 10 lives, 50 coins
-- **Tower Placement**: Place towers on green buildable areas (not on the path)
-- **Earning Coins**: +10 coins per enemy defeated
+- **Tower Placement**: Place towers on green buildable areas (costs 15 coins per tower)
+- **Tower Removal**: Right-click removes towers and refunds 10 coins
+- **Earning Coins**: +5 coins per enemy defeated
 - **Wave System**: Each wave spawns more enemies than the previous
 - **Lives**: Lose 1 life per enemy that reaches the end
 
 ### Shop Items
-1. **Tower Slot** (30 coins) - Unlock an additional tower slot
-2. **Damage Upgrade** (50 coins) - Increase all towers' damage by +10
-3. **Fire Rate Upgrade** (45 coins) - Increase all towers' fire rate by 10%
+1. **Tower Slot** (100 coins) - Unlock an additional tower slot
+2. **Damage Upgrade** (25 coins) - Increase all towers' damage by +5
+3. **Fire Rate Upgrade** (20 coins) - Increase all towers' fire rate by 10%
 
 ## 🔧 Setup and Installation
 
@@ -84,7 +85,7 @@ Prevent enemies from reaching the end of the path by strategically placing defen
 
 ```bash
 # Clone the repository
-git clone https://github.com/nx23/final-path.git
+git clone https://github.com/nx23/FinalPath.git
 cd FinalPath
 
 # Download dependencies
@@ -129,16 +130,26 @@ The project follows a clean, modular architecture with clear separation of conce
 
 - **Window Size**: 800x720 pixels
 - **HUD Height**: 120 pixels
+- **Economy**:
+  - Tower Cost: 15 coins
+  - Tower Refund: 10 coins
+  - Enemy Reward: 5 coins
+  - Starting Coins: 50
 - **Tower Stats**:
   - Base Damage: 10
   - Base Fire Rate: 1.0 shots/second
   - Range: 100 pixels
 - **Enemy Stats**:
-  - Base Health: 100 HP
+  - Base Health: 10 HP (scales with wave: 10 + (1 + (wave-1)*2) + (20 * difficulty))
+  - Base Speed: 2.0 (scales with wave: 2 * (1 + (wave-1)*0.1))
   - Size: 25x25 pixels
 - **Wave Scaling**: Base 3 enemies + 2 per wave number
+- **Shop Prices**:
+  - Tower Slot: 100 coins
+  - Damage +5: 25 coins
+  - Fire Rate +10%: 20 coins
 
-## 📝 Code Conventions
+## �📝 Code Conventions
 
 - **Exported** functions and types start with uppercase (e.g., `NewEnemy`)
 - **Private** functions and fields start with lowercase (internal use only)
