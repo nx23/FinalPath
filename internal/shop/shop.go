@@ -33,9 +33,9 @@ func NewShop() *Shop {
 		Width:  400,
 		Height: 320,
 		Items: []ShopItem{
-			{ID: 1, Name: "Buy Tower Slot", Cost: 30, Description: "Add +1 tower slot", Y: 100},
-			{ID: 2, Name: "Tower Damage +10", Cost: 50, Description: "Increase all tower damage by +10", Y: 160},
-			{ID: 4, Name: "Fire Rate +10%", Cost: 45, Description: "Increase all tower fire rate by 10%", Y: 220},
+			{ID: 0, Name: "Buy Tower Slot", Cost: 100, Description: "Add +1 tower slot", Y: 100},
+			{ID: 1, Name: "Tower Damage +5", Cost: 25, Description: "Increase all tower damage by +5", Y: 160},
+			{ID: 2, Name: "Fire Rate +10%", Cost: 20, Description: "Increase all tower fire rate by 10%", Y: 220},
 		},
 	}
 }
@@ -151,15 +151,22 @@ func (s *Shop) PurchaseItem(itemID, coins, towerLimit, towerDamageBoost int, tow
 
 	// Apply effect based on item ID
 	switch itemID {
-	case 1: // Buy Tower Slot
+	case 0: // Buy Tower Slot
 		newTowerLimit++
-	case 2: // Tower Damage Upgrade
-		newDamageBoost += 10
-	case 4: // Fire Rate Upgrade
+		s.UpdateItemCosts(0, item.Cost+100)
+	case 1: // Tower Damage Upgrade
+		newDamageBoost += 5
+		s.UpdateItemCosts(1, item.Cost+35)
+	case 2: // Fire Rate Upgrade
 		newFireRateBoost += 0.1
+		s.UpdateItemCosts(2, item.Cost+20)
 	default:
 		return coins, towerLimit, towerDamageBoost, towerFireRateBoost, false
 	}
 
 	return newCoins, newTowerLimit, newDamageBoost, newFireRateBoost, true
+}
+
+func (s *Shop) UpdateItemCosts(itemIndex int, newCost int) {
+	s.Items[itemIndex].Cost = newCost
 }
