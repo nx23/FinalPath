@@ -13,6 +13,8 @@ import (
 type HUD struct {
 	TowersBuilt         int
 	TowersLimit         int
+	TowerCost           int
+	TowerRefund         int
 	EnemiesDefeated     int
 	CurrentWave         int
 	WaveActive          bool
@@ -30,17 +32,19 @@ type HUD struct {
 	shopButtonHeight    float32
 }
 
-func NewHUD(towerLimit int) *HUD {
+func NewHUD(towerLimit int, towerCost int, towerRefund int, initialLives int, initialCoins int) *HUD {
 	return &HUD{
 		TowersBuilt:         0,
 		TowersLimit:         towerLimit,
+		TowerCost:           towerCost,
+		TowerRefund:         towerRefund,
 		EnemiesDefeated:     0,
 		CurrentWave:         0,
 		WaveActive:          false,
 		EnemiesInWave:       3,
 		EnemiesKilledInWave: 0,
-		Lives:               10,
-		Coins:               50,
+		Lives:               initialLives,
+		Coins:               initialCoins,
 		buttonX:             620,
 		buttonY:             35,
 		buttonWidth:         150,
@@ -58,28 +62,36 @@ func (h *HUD) Draw(screen *ebiten.Image) {
 	vector.FillRect(screen, 0, 0, screenWidth, config.HUDHeight, color.RGBA{0, 0, 0, 255}, false)
 
 	// Tower info
-	towerText := fmt.Sprintf("Towers: %d/%d", h.TowersBuilt, h.TowersLimit)
-	utils.DrawLargeText(screen, towerText, 20, 20, 2.5)
+	towerText := fmt.Sprintf("Towers Placed: %d/%d", h.TowersBuilt, h.TowersLimit)
+	utils.DrawLargeText(screen, towerText, 20, 10, 2.0)
+
+	// Tower costs info
+	costText := fmt.Sprintf("Tower Cost: %d coins", h.TowerCost)
+	utils.DrawLargeText(screen, costText, 20, 45, 2.0)
+
+	// Tower refund info
+	refundText := fmt.Sprintf("Tower Refund: %d coins", h.TowerRefund)
+	utils.DrawLargeText(screen, refundText, 20, 80, 2.0)
 
 	// Wave progress info (when active)
 	if h.WaveActive {
 		waveProgressText := fmt.Sprintf("Wave %d: %d/%d", h.CurrentWave, h.EnemiesKilledInWave, h.EnemiesInWave)
-		utils.DrawLargeText(screen, waveProgressText, 280, 20, 2.5)
+		utils.DrawLargeText(screen, waveProgressText, 350, 10, 2.0)
 	}
 
 	// Next wave preview (when not active)
 	if !h.WaveActive && h.EnemiesInWave > 0 {
 		nextWaveText := fmt.Sprintf("Next Wave: %d enemies", h.EnemiesInWave)
-		utils.DrawLargeText(screen, nextWaveText, 280, 20, 2.5)
+		utils.DrawLargeText(screen, nextWaveText, 350, 10, 2.0)
 	}
 
-	// Enemies defeated info (aligned with wave info)
-	enemyText := fmt.Sprintf("Defeated: %d", h.EnemiesDefeated)
-	utils.DrawLargeText(screen, enemyText, 280, 65, 2.5)
+	// Coins info
+	coinsText := fmt.Sprintf("Coins: %d", h.Coins)
+	utils.DrawLargeText(screen, coinsText, 350, 45, 2.0)
 
 	// Lives info
 	livesText := fmt.Sprintf("Lives: %d", h.Lives)
-	utils.DrawLargeText(screen, livesText, 20, 65, 2.5)
+	utils.DrawLargeText(screen, livesText, 350, 80, 2.0)
 
 	// Draw Next Wave button
 	h.drawButton(screen)
@@ -135,7 +147,7 @@ func (h *HUD) drawShopButton(screen *ebiten.Image) {
 	vector.StrokeRect(screen, h.shopButtonX, h.shopButtonY, h.shopButtonWidth, h.shopButtonHeight, 2, color.RGBA{255, 255, 255, 255}, false)
 
 	// Draw button text
-	utils.DrawLargeText(screen, "SHOP", float64(h.shopButtonX)+45, float64(h.shopButtonY)+3, 1.5)
+	utils.DrawLargeText(screen, "SHOP", float64((h.shopButtonWidth/2)+h.shopButtonX-15), float64(h.shopButtonY), 1.5)
 }
 
 // IsShopButtonClicked checks if the shop button was clicked
